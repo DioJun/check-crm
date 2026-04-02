@@ -55,25 +55,30 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile toggle */}
-      <button
-        className="fixed top-4 left-4 z-50 lg:hidden bg-indigo-600 text-white p-2 rounded-lg shadow-lg"
-        onClick={() => setMobileOpen((o) => !o)}
-      >
-        {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-      </button>
+      {/* Mobile header */}
+      <header className="fixed top-0 left-0 right-0 z-50 lg:hidden bg-indigo-800 border-b border-indigo-700 h-16 flex items-center px-4">
+        <button
+          className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 transition-colors"
+          onClick={() => setMobileOpen((o) => !o)}
+        >
+          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+        <div className="ml-4">
+          <h1 className="text-white font-bold text-lg leading-tight">TemplatesHub CRM</h1>
+        </div>
+      </header>
 
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden mt-16"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Mobile sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-indigo-800 transform transition-transform duration-200 ease-in-out lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-indigo-800 transform transition-transform duration-200 ease-in-out lg:hidden mt-16 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

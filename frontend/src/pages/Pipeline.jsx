@@ -233,7 +233,7 @@ export default function Pipeline() {
 
       {/* Mobile Move Modal */}
       {selectedLead && (
-        <div className="fixed inset-0 bg-black/50 flex items-end z-50 sm:hidden">
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white w-full rounded-t-2xl p-0">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between rounded-t-2xl">
               <h3 className="font-semibold text-gray-900">{selectedLead.nome}</h3>
