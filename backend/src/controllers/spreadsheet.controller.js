@@ -34,6 +34,45 @@ function isGoogleMapsPlanilha(columns) {
 }
 
 /**
+ * Extrai telefone de uma string
+ */
+function extrairTelefone(texto) {
+  if (!texto) return '';
+  
+  // Padrão para telefones brasileiros: (XX) XXXXX-XXXX, (XX) XXXX-XXXX, +55 XX XXXXX-XXXX, etc
+  const padroes = [
+    /\+?55\s?[\(]?(\d{2})[\)]?\s?(\d{4,5})\-?(\d{4})/,  // +55 (XX) XXXXX-XXXX
+    /[\(]?(\d{2})[\)]?\s?(\d{4,5})\-?(\d{4})/            // (XX) XXXXX-XXXX
+  ];
+  
+  for (const padrao of padroes) {
+    const match = String(texto).match(padrao);
+    if (match) {
+      const ddd = match[1];
+      const primeira = match[2];
+      const segunda = match[3];
+      return `+55${ddd}${primeira}${segunda}`;
+    }
+  }
+  
+  return '';
+}
+
+/**
+ * Extrai site/URL de uma string
+ */
+function extrairSite(texto) {
+  if (!texto) return '';
+  
+  // Se começar com http, é um site
+  if (String(texto).toLowerCase().startsWith('http')) {
+    return String(texto).trim();
+  }
+  
+  return '';
+}
+
+/**
  * Extrai dados de uma planilha do Google Maps
  */
 function parseGoogleMapsPlanilha(buffer) {
@@ -45,15 +84,35 @@ function parseGoogleMapsPlanilha(buffer) {
 
   rows.forEach((row) => {
     const values = Object.values(row)
-      .map(v => String(v).trim())
-      .filter(v => v.length > 0);
+      .map(v => String(v).trim());
 
     if (values.length >= 2) {
-      // Google Maps format: [URL, Nome, Rating, Reviews, Serviço, ...]
+      // Google Maps format: [URL, Nome, Rating, Reviews, Serviço, ..., Telefone, Site, ...]
       const nome = values[1]; // 2ª coluna é sempre o nome
       const servico = values.length >= 5 ? values[4] : 'Serviço'; // 5ª coluna é o serviço
       const avaliacao = values.length >= 3 ? values[2] : '';
       const reviews = values.length >= 4 ? values[3] : '';
+
+      // Procurar telefone e site em todas as colunas
+      let telefone = '';
+      let site = '';
+      
+      for (let i = 5; i < values.length; i++) {
+        const valor = values[i];
+        
+        // Tentar extrair telefone
+        if (!telefone && valor.match(/[\(\)0-9\-\+\s]/)) {
+          const tel = extrairTelefone(valor);
+          if (tel) {
+            telefone = tel;
+          }
+        }
+        
+        // Tentar extrair site
+        if (!site && valor.toLowerCase().startsWith('http')) {
+          site = extrairSite(valor);
+        }
+      }
 
       // Filtrar linhas vazias ou headers
       if (nome && nome.length > 2) {
@@ -62,7 +121,8 @@ function parseGoogleMapsPlanilha(buffer) {
           servico: servico.trim(),
           avaliacao: avaliacao.replace(',', '.'),
           reviews,
-          telefone: '',
+          telefone: telefone,
+          site: site,
           cidade: '',
           origem: 'Google Maps'
         });
@@ -205,6 +265,7 @@ async function importGoogleMapsLeads(req, res) {
         
         // Se não tem nome, não é um lead válido
         if (lead.nome) {
+          // Usar telefone extraído ou fornecido
           const telefone = (lead.telefone && lead.telefone.trim()) 
             ? lead.telefone 
             : '';
@@ -218,7 +279,7 @@ async function importGoogleMapsLeads(req, res) {
             origem: 'Google Maps',
             avaliacao: lead.avaliacao,
             reviews: lead.reviews,
-            temWhatsapp: temWhatsapp || (telefone ? true : false), // Se tiver telefone, assume que tem WhatsApp
+            temWhatsapp: temWhatsapp || (telefone ? true : false), // Se tiver telefone extraído, assume que tem WhatsApp
             temSite: temSite,
             site: lead.site || ''
           };
@@ -234,7 +295,7 @@ async function importGoogleMapsLeads(req, res) {
     const result = await leadService.importLeads(leadsWithData);
 
     return res.json({
-      message: `${result.created || 0} leads importados com sucesso`,
+      message: `${result.imported || 0} leads importados com sucesso`,
       ...result
     });
   } catch (err) {

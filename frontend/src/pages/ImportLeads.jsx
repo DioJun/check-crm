@@ -88,6 +88,20 @@ export default function ImportLeads() {
         setDuplicates([]);
       }
 
+      // Pré-preencher telefones e sites extraídos
+      const pre_telefones = {};
+      const pre_sites = {};
+      res.data.data.forEach((lead, idx) => {
+        if (lead.telefone) {
+          pre_telefones[idx] = lead.telefone;
+        }
+        if (lead.site) {
+          pre_sites[idx] = lead.site;
+        }
+      });
+      setTelefones(pre_telefones);
+      setSites(pre_sites);
+
       if (res.data.isGoogleMaps) {
         setSingleCity('');
         setStep(2);
@@ -145,11 +159,12 @@ export default function ImportLeads() {
       // Criar array de site para todos os leads (vistos até 10)
       const siteArray = spreadsheetData.map((_, idx) => siteStatus[idx] || false);
       
-      // Adicionar telefones e sites aos dados
+      // Mesclar dados editados com dados extraídos
       const dataWithMetadata = spreadsheetData.map((lead, idx) => ({
         ...lead,
-        telefone: telefones[idx] || lead.telefone || '',
-        site: sites[idx] || ''
+        // Usar valor editado ou manter o extraído
+        telefone: telefones[idx] !== undefined ? telefones[idx] : (lead.telefone || ''),
+        site: sites[idx] !== undefined ? sites[idx] : (lead.site || '')
       }));
       
       const res = await api.post('/leads/import-google-maps', {
@@ -346,6 +361,12 @@ export default function ImportLeads() {
                       className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     />
                   </div>
+                  {telefones[idx] && (
+                    <p className="text-xs text-green-600 mb-2">✓ Telefone extraído</p>
+                  )}
+                  {sites[idx] && (
+                    <p className="text-xs text-green-600 mb-2">✓ Site extraído</p>
+                  )}
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -356,15 +377,17 @@ export default function ImportLeads() {
                       />
                       <span className="text-xs text-gray-600">WhatsApp</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={siteStatus[idx] || false}
-                        onChange={(e) => setSiteStatus({...siteStatus, [idx]: e.target.checked})}
-                        className="w-4 h-4 rounded border-gray-300"
-                      />
-                      <span className="text-xs text-gray-600">Tem Site</span>
-                    </label>
+                    {sites[idx] && (
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={siteStatus[idx] || false}
+                          onChange={(e) => setSiteStatus({...siteStatus, [idx]: e.target.checked})}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                        <span className="text-xs text-gray-600">Confirmar Site</span>
+                      </label>
+                    )}
                   </div>
                 </div>
               ))}
