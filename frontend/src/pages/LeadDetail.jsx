@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MessageSquare, Phone, StickyNote } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Phone, StickyNote, ExternalLink, Edit2, Check, X } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/ui/StatusBadge';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
@@ -33,6 +33,15 @@ export default function LeadDetail() {
   const [interactionForm, setInteractionForm] = useState({ tipo: 'mensagem', conteudo: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  
+  // Edição de informações adicionais
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [editForm, setEditForm] = useState({
+    site: '',
+    temWhatsapp: false,
+    temSite: false,
+  });
+  const [savingInfo, setSavingInfo] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -40,6 +49,15 @@ export default function LeadDetail() {
       api.get(`/interactions/${id}`),
     ]).then(([leadRes, interRes]) => {
       setLead(leadRes.data?.lead || leadRes.data);
+      const lead = leadRes.data?.lead || leadRes.data;
+      
+      // Inicializar form de edição
+      setEditForm({
+        site: lead?.site || '',
+        temWhatsapp: lead?.temWhatsapp || false,
+        temSite: lead?.temSite || false,
+      });
+      
       const raw = interRes.data?.interactions || interRes.data || [];
       setInteractions([...raw].sort((a, b) => new Date(b.data || b.createdAt) - new Date(a.data || a.createdAt)));
     }).catch(() => setError('Erro ao carregar dados do lead'))
@@ -71,6 +89,28 @@ export default function LeadDetail() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleSaveInfo() {
+    setSavingInfo(true);
+    try {
+      const res = await api.put(`/leads/${id}`, editForm);
+      setLead((l) => ({ ...l, ...editForm, ...res.data?.lead }));
+      setEditingInfo(false);
+    } catch {
+      setError('Erro ao atualizar informações');
+    } finally {
+      setSavingInfo(false);
+    }
+  }
+
+  function handleCancelEdit() {
+    setEditForm({
+      site: lead?.site || '',
+      temWhatsapp: lead?.temWhatsapp || false,
+      temSite: lead?.temSite || false,
+    });
+    setEditingInfo(false);
   }
 
   if (loading) {
@@ -124,6 +164,104 @@ export default function LeadDetail() {
           </div>
         </div>
       </div>
+
+      {/* Additional Info section */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-900">Informações Adicionais</h2>
+          {!editingInfo && (
+            <button
+              onClick={() => setEditingInfo(true)}
+              className="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700 transition-colors"
+            >
+              <Edit2 className="w-4 h-4" />
+              Editar
+            </button>
+          )}
+        </div>
+
+        {editingInfo ? (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Site
+              </label>
+              <input
+                type="url"
+                value={editForm.site}
+                onChange={(e) => setEditForm({ ...editForm, site: e.target.value })}
+                placeholder="https://exemplo.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editForm.temWhatsapp}
+                  onChange={(e) => setEditForm({ ...editForm, temWhatsapp: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <span className="text-sm text-gray-700">Tem WhatsApp</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editForm.temSite}
+                  onChange={(e) => setEditForm({ ...editForm, temSite: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <span className="text-sm text-gray-700">Tem Site</span>
+              </label>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={handleSaveInfo}
+                disabled={savingInfo}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Check className="w-4 h-4" />
+                Salvar
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                disabled={savingInfo}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <InfoItemWithLink 
+              label="Site" 
+              value={lead?.site}
+            />
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-gray-500">WhatsApp:</span>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead?.temWhatsapp ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                {lead?.temWhatsapp ? '✓ Sim' : '✗ Não'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-gray-500">Site:</span>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead?.temSite ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                {lead?.temSite ? '✓ Sim' : '✗ Não'}
+              </span>
+            </div>
+            {lead?.avaliacao && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-gray-500">Avaliação:</span>
+                <span className="text-yellow-600 font-medium">⭐ {lead.avaliacao}</span>
+                {lead?.reviews && <span className="text-gray-500">({lead.reviews})</span>}
+              </div>
+            )}
+          </div>
+        )}
 
       {/* Add interaction */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
@@ -197,6 +335,27 @@ function InfoItem({ label, value }) {
     <div>
       <p className="text-xs font-medium text-gray-500 mb-0.5">{label}</p>
       <p className="text-sm text-gray-900">{value || '-'}</p>
+    </div>
+  );
+}
+
+function InfoItemWithLink({ label, value }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-gray-500">{label}:</span>
+      {value ? (
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-1 break-all"
+        >
+          <span className="truncate">{value}</span>
+          <ExternalLink className="w-3 h-3 flex-shrink-0" />
+        </a>
+      ) : (
+        <span className="text-gray-400">-</span>
+      )}
     </div>
   );
 }
