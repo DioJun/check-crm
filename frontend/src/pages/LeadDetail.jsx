@@ -41,7 +41,7 @@ export default function LeadDetail() {
     ]).then(([leadRes, interRes]) => {
       setLead(leadRes.data?.lead || leadRes.data);
       const raw = interRes.data?.interactions || interRes.data || [];
-      setInteractions([...raw].sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at)));
+      setInteractions([...raw].sort((a, b) => new Date(b.data || b.createdAt) - new Date(a.data || a.createdAt)));
     }).catch(() => setError('Erro ao carregar dados do lead'))
       .finally(() => setLoading(false));
   }, [id]);
@@ -62,7 +62,7 @@ export default function LeadDetail() {
     if (!interactionForm.conteudo.trim()) return;
     setSubmitting(true);
     try {
-      const res = await api.post('/interactions', { leadId: id, ...interactionForm });
+      const res = await api.post(`/interactions/${id}`, interactionForm);
       const newItem = res.data?.interaction || res.data;
       setInteractions((prev) => [newItem, ...prev]);
       setInteractionForm((f) => ({ ...f, conteudo: '' }));
@@ -179,7 +179,7 @@ export default function LeadDetail() {
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${TIPO_COLORS[item.tipo] || 'bg-gray-100 text-gray-700'}`}>
                       {item.tipo}
                     </span>
-                    <span className="text-xs text-gray-400">{formatDateTime(item.createdAt || item.created_at)}</span>
+                    <span className="text-xs text-gray-400">{formatDateTime(item.data || item.createdAt)}</span>
                   </div>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.conteudo}</p>
                 </div>

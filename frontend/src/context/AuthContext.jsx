@@ -15,7 +15,7 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem('crm_token'));
 
   async function login(email, password) {
-    const response = await api.post('/auth/login', { email, password });
+    const response = await api.post('/auth/login', { email, senha: password });
     const { token: newToken, user: newUser } = response.data;
     localStorage.setItem('crm_token', newToken);
     localStorage.setItem('crm_user', JSON.stringify(newUser));
