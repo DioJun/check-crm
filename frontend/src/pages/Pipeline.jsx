@@ -70,7 +70,7 @@ function SortableCard({ lead, onMoveClick }) {
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none">
       <LeadCard lead={lead} isDragging={isDragging} onMoveClick={onMoveClick} />
     </div>
   );
@@ -116,9 +116,7 @@ export default function Pipeline() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5,
-        delay: 0,
-        tolerance: 5,
+        distance: 20,
       },
     })
   );
