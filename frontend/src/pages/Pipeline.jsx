@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   DndContext,
-  closestCenter,
+  pointerWithin,
   PointerSensor,
   useSensor,
   useSensors,
@@ -93,7 +93,15 @@ export default function Pipeline() {
   const [activeId, setActiveId] = useState(null);
   const [error, setError] = useState('');
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+        delay: 0,
+        tolerance: 5,
+      },
+    })
+  );
 
   useEffect(() => {
     api.get('/leads')
@@ -171,24 +179,26 @@ export default function Pipeline() {
         <div className="mb-4 text-red-600 bg-red-50 border border-red-200 rounded-lg p-4">{error}</div>
       )}
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={({ active }) => setActiveId(active.id)}
-        onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveId(null)}
-      >
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {COLUMNS.map((col) => {
-            const colLeads = leads.filter((l) => l.status === col.id);
-            return <Column key={col.id} column={col} leads={colLeads} />;
-          })}
-        </div>
+      <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white p-2">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={pointerWithin}
+          onDragStart={({ active }) => setActiveId(active.id)}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveId(null)}
+        >
+          <div className="flex gap-4 min-w-max">
+            {COLUMNS.map((col) => {
+              const colLeads = leads.filter((l) => l.status === col.id);
+              return <Column key={col.id} column={col} leads={colLeads} />;
+            })}
+          </div>
 
-        <DragOverlay>
-          {activeLead ? <LeadCard lead={activeLead} /> : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activeLead ? <LeadCard lead={activeLead} /> : null}
+          </DragOverlay>
+        </DndContext>
+      </div>
     </div>
   );
 }
