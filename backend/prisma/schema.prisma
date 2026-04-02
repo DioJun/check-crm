@@ -20,13 +20,15 @@ model Usuario {
 model Lead {
   id              String       @id @default(uuid())
   nome            String
-  telefone        String       @unique
+  telefone        String?
   cidade          String?
   servico         String?
   status          LeadStatus   @default(novo)
   origem          String?
   dataEntrada     DateTime     @default(now())
   ultimaInteracao DateTime?
+  avaliacao       String?
+  reviews         String?
   interacoes      Interacao[]
 }
 

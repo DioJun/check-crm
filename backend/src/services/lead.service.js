@@ -56,19 +56,40 @@ async function importLeads(leads) {
   const seen = new Set();
   const normalized = [];
   for (const lead of leads) {
-    const tel = normalizeTelefone(lead.telefone || '');
-    if (!seen.has(tel)) {
-      seen.add(tel);
-      normalized.push({ ...lead, telefone: tel, status: 'novo', dataEntrada: now });
+    const tel = (lead.telefone && lead.telefone.trim()) ? normalizeTelefone(lead.telefone) : '';
+    const key = tel || lead.nome; // Use nome como chave se não tiver telefone
+    
+    if (!seen.has(key)) {
+      seen.add(key);
+      normalized.push({ 
+        ...lead, 
+        telefone: tel,
+        status: 'novo', 
+        dataEntrada: now 
+      });
     }
   }
 
-  // Find which telefones already exist in the database
-  const telefones = normalized.map((l) => l.telefone);
-  const existing = await leadRepository.findManyByTelefone(telefones);
-  const existingSet = new Set(existing.map((l) => l.telefone));
+  // Find which telefones already exist (apenas se tiverem telefone)
+  const telefonesComValor = normalized
+    .filter(l => l.telefone && l.telefone.trim())
+    .map(l => l.telefone);
+  
+  let existingSet = new Set();
+  if (telefonesComValor.length > 0) {
+    const existing = await leadRepository.findManyByTelefone(telefonesComValor);
+    existingSet = new Set(existing.map((l) => l.telefone));
+  }
 
-  const toInsert = normalized.filter((l) => !existingSet.has(l.telefone));
+  const toInsert = normalized.filter((l) => {
+    // Se tiver telefone, verificar se já existe
+    if (l.telefone && l.telefone.trim()) {
+      return !existingSet.has(l.telefone);
+    }
+    // Se não tiver telefone (Google Maps), sempre inserir
+    return true;
+  });
+  
   const skipped = normalized.length - toInsert.length;
 
   if (toInsert.length > 0) {

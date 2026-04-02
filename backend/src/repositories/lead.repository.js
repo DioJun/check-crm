@@ -53,6 +53,11 @@ async function countToday() {
 }
 
 async function findManyByTelefone(telefones) {
+  // Retornar vazio se não houver telefones para buscar
+  if (!telefones || telefones.length === 0) {
+    return [];
+  }
+  
   return prisma.lead.findMany({
     where: { telefone: { in: telefones } },
     select: { telefone: true },

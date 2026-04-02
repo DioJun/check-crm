@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Kanban, LogOut, X, Menu } from 'lucide-react';
+import { LayoutDashboard, Users, Kanban, LogOut, X, Menu, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -7,6 +7,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/leads', label: 'Leads', icon: Users },
   { to: '/pipeline', label: 'Pipeline', icon: Kanban },
+  { to: '/import-leads', label: 'Importar Leads', icon: Upload },
 ];
 
 export default function Sidebar() {
