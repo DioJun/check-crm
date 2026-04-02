@@ -236,32 +236,50 @@ export default function LeadDetail() {
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            <InfoItemWithLink 
-              label="Site" 
-              value={lead?.site}
-            />
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-500">WhatsApp:</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-xs font-medium text-gray-500 mb-2">Site</p>
+              {lead?.site ? (
+                <a
+                  href={lead.site}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 hover:text-indigo-700 hover:underline break-all text-sm flex items-center gap-1"
+                >
+                  {lead.site}
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                </a>
+              ) : (
+                <p className="text-sm text-gray-400">Não informado</p>
+              )}
+            </div>
+            
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-xs font-medium text-gray-500 mb-2">WhatsApp</p>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead?.temWhatsapp ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
-                {lead?.temWhatsapp ? '✓ Sim' : '✗ Não'}
+                {lead?.temWhatsapp ? '✓ Tem WhatsApp' : '✗ Sem WhatsApp'}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-500">Site:</span>
+
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-xs font-medium text-gray-500 mb-2">Tem Site</p>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead?.temSite ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
-                {lead?.temSite ? '✓ Sim' : '✗ Não'}
+                {lead?.temSite ? '✓ Tem Site' : '✗ Sem Site'}
               </span>
             </div>
+
             {lead?.avaliacao && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-500">Avaliação:</span>
-                <span className="text-yellow-600 font-medium">⭐ {lead.avaliacao}</span>
-                {lead?.reviews && <span className="text-gray-500">({lead.reviews})</span>}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-500 mb-2">Avaliação</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-yellow-600 font-medium">⭐ {lead.avaliacao}</span>
+                  {lead?.reviews && <span className="text-gray-500 text-sm">({lead.reviews})</span>}
+                </div>
               </div>
             )}
           </div>
         )}
+      </div>
 
       {/* Add interaction */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
@@ -335,27 +353,6 @@ function InfoItem({ label, value }) {
     <div>
       <p className="text-xs font-medium text-gray-500 mb-0.5">{label}</p>
       <p className="text-sm text-gray-900">{value || '-'}</p>
-    </div>
-  );
-}
-
-function InfoItemWithLink({ label, value }) {
-  return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="text-gray-500">{label}:</span>
-      {value ? (
-        <a
-          href={value}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-1 break-all"
-        >
-          <span className="truncate">{value}</span>
-          <ExternalLink className="w-3 h-3 flex-shrink-0" />
-        </a>
-      ) : (
-        <span className="text-gray-400">-</span>
-      )}
     </div>
   );
 }
