@@ -61,10 +61,9 @@ export default function Dashboard() {
   }
 
   const total = stats?.total || 0;
-  const hoje = stats?.hoje || 0;
+  const hoje = stats?.today || 0;
   const novos = stats?.byStatus?.novo || 0;
-  const fechados = stats?.byStatus?.fechado || 0;
-  const taxa = total > 0 ? ((fechados / total) * 100).toFixed(1) : '0.0';
+  const taxa = stats?.conversionRate != null ? Number(stats.conversionRate).toFixed(1) : '0.0';
 
   const statuses = ['novo', 'contatado', 'interessado', 'fechado'];
 
