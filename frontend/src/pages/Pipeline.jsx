@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronRight, X } from 'lucide-react';
+import { ChevronRight, X, MoreVertical } from 'lucide-react';
 import api from '../services/api';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
 
@@ -25,19 +25,32 @@ const COLUMNS = [
   { id: 'fechado', label: 'Fechado', color: 'bg-green-500', light: 'bg-green-50 border-green-200' },
 ];
 
-function LeadCard({ lead, isDragging = false, onClick }) {
+function LeadCard({ lead, isDragging = false, onMoveClick }) {
   return (
     <div
-      onClick={onClick}
       className={`bg-white rounded-lg border border-gray-200 p-3 shadow-sm ${
         isDragging ? 'opacity-50 rotate-1' : 'hover:shadow-md'
-      } transition-shadow cursor-grab active:cursor-grabbing`}
+      } transition-shadow`}
     >
-      <p className="font-semibold text-gray-900 text-sm">{lead.nome}</p>
-      {lead.servico && <p className="text-xs text-gray-500 mt-0.5">{lead.servico}</p>}
-      {lead.cidade && <p className="text-xs text-gray-400">{lead.cidade}</p>}
-      <div className="mt-2">
-        <WhatsAppButton telefone={lead.telefone} nome={lead.nome} className="!py-1 !px-2 !text-xs" />
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <p className="font-semibold text-gray-900 text-sm">{lead.nome}</p>
+          {lead.servico && <p className="text-xs text-gray-500 mt-0.5">{lead.servico}</p>}
+          {lead.cidade && <p className="text-xs text-gray-400">{lead.cidade}</p>}
+          <div className="mt-2">
+            <WhatsAppButton telefone={lead.telefone} nome={lead.nome} className="!py-1 !px-2 !text-xs" />
+          </div>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveClick(lead);
+          }}
+          className="flex-shrink-0 p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+          title="Mover para outro status"
+        >
+          <MoreVertical className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );
@@ -55,7 +68,7 @@ function SortableCard({ lead, onMoveClick }) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <LeadCard lead={lead} isDragging={isDragging} onClick={() => onMoveClick(lead)} />
+      <LeadCard lead={lead} isDragging={isDragging} onMoveClick={onMoveClick} />
     </div>
   );
 }
@@ -226,7 +239,7 @@ export default function Pipeline() {
           </div>
 
           <DragOverlay>
-            {activeLead ? <LeadCard lead={activeLead} /> : null}
+            {activeLead ? <LeadCard lead={activeLead} onMoveClick={() => {}} /> : null}
           </DragOverlay>
         </DndContext>
       </div>
