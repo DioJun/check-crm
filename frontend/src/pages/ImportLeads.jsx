@@ -26,6 +26,8 @@ export default function ImportLeads() {
   // Google Maps cities
   const [cities, setCities] = useState({});
   const [singleCity, setSingleCity] = useState('');
+  const [whatsappStatus, setWhatsappStatus] = useState({});
+  const [siteStatus, setSiteStatus] = useState({});
 
   async function handleFileSelect(e) {
     const selected = e.target.files?.[0];
@@ -124,9 +126,17 @@ export default function ImportLeads() {
       // Aplicar a mesma cidade para todos os leads
       const citiesArray = spreadsheetData.map(() => singleCity);
       
+      // Criar array de whatsapp para todos os leads (vistos até 10)
+      const whatsappArray = spreadsheetData.map((_, idx) => whatsappStatus[idx] || false);
+      
+      // Criar array de site para todos os leads (vistos até 10)
+      const siteArray = spreadsheetData.map((_, idx) => siteStatus[idx] || false);
+      
       const res = await api.post('/leads/import-google-maps', {
         data: spreadsheetData,
-        cities: citiesArray
+        cities: citiesArray,
+        hasWhatsapp: whatsappArray,
+        hasSite: siteArray
       });
 
       setSuccess(res.data.message || 'Leads importados com sucesso');
@@ -146,6 +156,8 @@ export default function ImportLeads() {
     setIsGoogleMaps(false);
     setMapping({ nome: '', telefone: '', cidade: '', servico: '', origem: '' });
     setSingleCity('');
+    setWhatsappStatus({});
+    setSiteStatus({});
     setError('');
     setSuccess('');
   }
@@ -271,13 +283,33 @@ export default function ImportLeads() {
             <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
               {spreadsheetData?.slice(0, 10).map((lead, idx) => (
                 <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 text-sm">{lead.nome}</p>
                       <p className="text-xs text-gray-600 mt-1">{lead.servico}</p>
                       {lead.avaliacao && (
                         <p className="text-xs text-yellow-600 mt-1">⭐ {lead.avaliacao} ({lead.reviews})</p>
                       )}
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={whatsappStatus[idx] || false}
+                          onChange={(e) => setWhatsappStatus({...whatsappStatus, [idx]: e.target.checked})}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                        <span className="text-xs text-gray-600">WhatsApp</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={siteStatus[idx] || false}
+                          onChange={(e) => setSiteStatus({...siteStatus, [idx]: e.target.checked})}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                        <span className="text-xs text-gray-600">Site</span>
+                      </label>
                     </div>
                   </div>
                 </div>

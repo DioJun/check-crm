@@ -190,7 +190,7 @@ async function importFromSpreadsheet(req, res) {
 
 async function importGoogleMapsLeads(req, res) {
   try {
-    const { data, cities } = req.body;
+    const { data, cities, hasWhatsapp, hasSite } = req.body;
 
     if (!Array.isArray(data) || data.length === 0) {
       return res.status(400).json({ error: 'Dados inválidos' });
@@ -200,18 +200,26 @@ async function importGoogleMapsLeads(req, res) {
     const leadsWithData = data
       .map((lead, idx) => {
         const cidade = cities?.[idx] || '';
+        const temWhatsapp = hasWhatsapp?.[idx] || false;
+        const temSite = hasSite?.[idx] || false;
         
-        // Se não tem telefone nem cidade, não é um lead válido para Google Maps
+        // Se não tem nome, não é um lead válido
         if (lead.nome) {
+          const telefone = (lead.telefone && lead.telefone.trim()) 
+            ? lead.telefone 
+            : '';
+
           return {
             nome: lead.nome,
-            telefone: '', // Sem telefone - serão contatos via WhatsApp apenas
+            telefone: telefone,
             cidade: cidade.trim(),
-            servico: lead.servico ||'Serviço',
+            servico: lead.servico || 'Serviço',
             status: 'novo',
             origem: 'Google Maps',
             avaliacao: lead.avaliacao,
-            reviews: lead.reviews
+            reviews: lead.reviews,
+            temWhatsapp: temWhatsapp || (telefone ? true : false), // Se tiver telefone, assume que tem WhatsApp
+            temSite: temSite
           };
         }
         return null;

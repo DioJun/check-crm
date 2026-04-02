@@ -29,6 +29,8 @@ model Lead {
   ultimaInteracao DateTime?
   avaliacao       String?
   reviews         String?
+  temWhatsapp     Boolean?
+  temSite         Boolean?
   interacoes      Interacao[]
 }
 
