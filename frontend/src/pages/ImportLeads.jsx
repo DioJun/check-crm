@@ -25,6 +25,7 @@ export default function ImportLeads() {
 
   // Google Maps cities
   const [cities, setCities] = useState({});
+  const [singleCity, setSingleCity] = useState('');
 
   async function handleFileSelect(e) {
     const selected = e.target.files?.[0];
@@ -72,12 +73,8 @@ export default function ImportLeads() {
       setIsGoogleMaps(res.data.isGoogleMaps);
 
       if (res.data.isGoogleMaps) {
-        // Inicializar cities object
-        const citiesObj = {};
-        res.data.data.forEach((_, idx) => {
-          citiesObj[idx] = '';
-        });
-        setCities(citiesObj);
+        // Inicializar com cidade vazia (será preenchida uma única vez)
+        setSingleCity('');
         setStep(2);
       } else {
         setStep(2);
@@ -124,7 +121,8 @@ export default function ImportLeads() {
     setLoading(true);
     setError('');
     try {
-      const citiesArray = spreadsheetData.map((_, idx) => cities[idx] || '');
+      // Aplicar a mesma cidade para todos os leads
+      const citiesArray = spreadsheetData.map(() => singleCity);
       
       const res = await api.post('/leads/import-google-maps', {
         data: spreadsheetData,
@@ -147,7 +145,7 @@ export default function ImportLeads() {
     setColumns([]);
     setIsGoogleMaps(false);
     setMapping({ nome: '', telefone: '', cidade: '', servico: '', origem: '' });
-    setCities({});
+    setSingleCity('');
     setError('');
     setSuccess('');
   }
@@ -247,44 +245,49 @@ export default function ImportLeads() {
             <div>
               <p className="font-medium text-blue-900">Google Maps detectado!</p>
               <p className="text-sm text-blue-800 mt-1">
-                {spreadsheetData?.length || 0} negócios encontrados. Adicione a cidade (opcional) para cada um.
+                {spreadsheetData?.length || 0} negócios encontrados.
               </p>
             </div>
           </div>
 
-          <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
-            {spreadsheetData?.map((lead, idx) => (
-              <div key={idx} className="border border-gray-200 rounded-lg p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Nome</p>
-                    <p className="text-gray-900 font-semibold">{lead.nome}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Serviço</p>
-                    <p className="text-gray-600">{lead.servico}</p>
-                  </div>
-                  {lead.avaliacao && (
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Avaliação</p>
-                      <p className="text-yellow-600 font-medium">⭐ {lead.avaliacao} ({lead.reviews} reviews)</p>
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Qual é a cidade desses leads?
+            </label>
+            <input
+              type="text"
+              value={singleCity}
+              onChange={(e) => setSingleCity(e.target.value)}
+              placeholder="Ex: São Paulo, Rio de Janeiro, Joinville..."
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Deixe em branco se quiser preencher depois
+            </p>
+          </div>
+
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Preview dos negócios a importar:</h3>
+            <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
+              {spreadsheetData?.slice(0, 10).map((lead, idx) => (
+                <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900 text-sm">{lead.nome}</p>
+                      <p className="text-xs text-gray-600 mt-1">{lead.servico}</p>
+                      {lead.avaliacao && (
+                        <p className="text-xs text-yellow-600 mt-1">⭐ {lead.avaliacao} ({lead.reviews})</p>
+                      )}
                     </div>
-                  )}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cidade (opcional)
-                    </label>
-                    <input
-                      type="text"
-                      value={cities[idx] || ''}
-                      onChange={(e) => setCities({ ...cities, [idx]: e.target.value })}
-                      placeholder="Ex: São Paulo"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+              {spreadsheetData && spreadsheetData.length > 10 && (
+                <p className="text-sm text-gray-500 text-center py-2">
+                  ... e mais {spreadsheetData.length - 10} negócios
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="mt-8 flex justify-between">
@@ -395,23 +398,33 @@ export default function ImportLeads() {
           </h2>
 
           <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6 mb-6">
-            <p className="text-indigo-900">
-              Você está prestes a importar <strong>{spreadsheetData?.length || 0} leads</strong>
-              {!isGoogleMaps && (
-                <>
-                  {' '}com o seguinte mapeamento:
-                  <ul className="mt-4 space-y-2">
-                    {Object.entries(mapping).map(([key, col]) => (
-                      col && (
-                        <li key={key} className="text-sm text-indigo-800">
-                          <strong>{key}:</strong> {col}
-                        </li>
-                      )
-                    ))}
-                  </ul>
-                </>
-              )}
-            </p>
+            {isGoogleMaps ? (
+              <>
+                <p className="text-indigo-900">
+                  Você está prestes a importar <strong>{spreadsheetData?.length || 0} negócios</strong> do Google Maps.
+                </p>
+                {singleCity && (
+                  <p className="text-indigo-800 mt-3">
+                    <strong>Cidade:</strong> {singleCity}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-indigo-900">
+                  Você está prestes a importar <strong>{spreadsheetData?.length || 0} leads</strong> com o seguinte mapeamento:
+                </p>
+                <ul className="mt-4 space-y-2">
+                  {Object.entries(mapping).map(([key, col]) => (
+                    col && (
+                      <li key={key} className="text-sm text-indigo-800">
+                        <strong>{key}:</strong> {col}
+                      </li>
+                    )
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
 
           <div className="mt-8 flex justify-between">
