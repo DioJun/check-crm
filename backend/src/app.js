@@ -5,6 +5,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth.routes');
 const leadRoutes = require('./routes/lead.routes');
 const interactionRoutes = require('./routes/interaction.routes');
+const scraperRoutes = require('./routes/scraper.routes');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/interactions', interactionRoutes);
+app.use('/api/scraper', scraperRoutes);
 
 // Only start the HTTP server when this file is run directly (local dev).
 // On Vercel the module is imported by api/index.js and used as a handler.
