@@ -12,6 +12,7 @@ import {
   verticalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import api from '../services/api';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
@@ -58,6 +59,10 @@ function SortableCard({ lead }) {
 }
 
 function Column({ column, leads }) {
+  const { setNodeRef } = useDroppable({
+    id: column.id,
+  });
+
   return (
     <div className="flex flex-col min-w-[260px] flex-1 max-w-sm">
       <div className={`rounded-t-xl px-4 py-3 flex items-center justify-between ${column.light} border`}>
@@ -66,7 +71,10 @@ function Column({ column, leads }) {
           {leads.length}
         </span>
       </div>
-      <div className={`flex-1 rounded-b-xl border border-t-0 ${column.light} p-2 min-h-[200px]`}>
+      <div
+        ref={setNodeRef}
+        className={`flex-1 rounded-b-xl border border-t-0 ${column.light} p-2 min-h-[200px]`}
+      >
         <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
             {leads.map((lead) => (
@@ -108,20 +116,26 @@ export default function Pipeline() {
     if (!over) return;
 
     const activeLeadId = active.id;
-    const overLeadId = over.id;
+    const overId = over.id;
 
-    // Determine target column
-    let targetStatus = COLUMNS.find((c) => c.id === overLeadId)?.id;
-    if (!targetStatus) {
-      targetStatus = findColumnForLead(overLeadId);
+    // Determine target status (coluna)
+    let targetStatus = overId;
+    
+    // Se o over é um lead, encontrar a coluna desse lead
+    if (!COLUMNS.find((c) => c.id === overId)) {
+      targetStatus = findColumnForLead(overId);
     }
 
     if (!targetStatus) return;
 
     const activeLead = getLeadById(activeLeadId);
-    if (!activeLead || activeLead.status === targetStatus) return;
+    if (!activeLead) return;
+
+    // Se o status é o mesmo, não fazer nada
+    if (activeLead.status === targetStatus) return;
 
     // Optimistic update
+    const oldStatus = activeLead.status;
     setLeads((prev) =>
       prev.map((l) => (l.id === activeLeadId ? { ...l, status: targetStatus } : l))
     );
@@ -131,7 +145,7 @@ export default function Pipeline() {
     } catch {
       // Revert on failure
       setLeads((prev) =>
-        prev.map((l) => (l.id === activeLeadId ? { ...l, status: activeLead.status } : l))
+        prev.map((l) => (l.id === activeLeadId ? { ...l, status: oldStatus } : l))
       );
     }
   }
