@@ -1,9 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const leadController = require('../controllers/lead.controller');
+const spreadsheetController = require('../controllers/spreadsheet.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 
 router.use(authMiddleware);
+
+// Rotas de upload de planilha
+router.post('/upload', spreadsheetController.upload, spreadsheetController.parseSpreadsheet);
+router.post('/import-spreadsheet', spreadsheetController.importFromSpreadsheet);
 
 router.get('/stats', leadController.getStats);
 router.get('/', leadController.getAll);

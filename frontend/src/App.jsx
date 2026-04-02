@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Leads from './pages/Leads';
 import LeadDetail from './pages/LeadDetail';
+import ImportLeads from './pages/ImportLeads';
 import Pipeline from './pages/Pipeline';
 
 function ProtectedRoute({ children }) {
@@ -48,6 +49,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout><LeadDetail /></Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/import-leads"
+        element={
+          <ProtectedRoute>
+            <Layout><ImportLeads /></Layout>
           </ProtectedRoute>
         }
       />
