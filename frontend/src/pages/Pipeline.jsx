@@ -14,6 +14,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { ChevronRight, X } from 'lucide-react';
 import api from '../services/api';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
 
@@ -24,9 +25,10 @@ const COLUMNS = [
   { id: 'fechado', label: 'Fechado', color: 'bg-green-500', light: 'bg-green-50 border-green-200' },
 ];
 
-function LeadCard({ lead, isDragging = false }) {
+function LeadCard({ lead, isDragging = false, onClick }) {
   return (
     <div
+      onClick={onClick}
       className={`bg-white rounded-lg border border-gray-200 p-3 shadow-sm ${
         isDragging ? 'opacity-50 rotate-1' : 'hover:shadow-md'
       } transition-shadow cursor-grab active:cursor-grabbing`}
@@ -41,7 +43,7 @@ function LeadCard({ lead, isDragging = false }) {
   );
 }
 
-function SortableCard({ lead }) {
+function SortableCard({ lead, onMoveClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: lead.id,
   });
@@ -53,12 +55,12 @@ function SortableCard({ lead }) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <LeadCard lead={lead} isDragging={isDragging} />
+      <LeadCard lead={lead} isDragging={isDragging} onClick={() => onMoveClick(lead)} />
     </div>
   );
 }
 
-function Column({ column, leads }) {
+function Column({ column, leads, onMoveClick }) {
   const { setNodeRef } = useDroppable({
     id: column.id,
   });
@@ -78,7 +80,7 @@ function Column({ column, leads }) {
         <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
             {leads.map((lead) => (
-              <SortableCard key={lead.id} lead={lead} />
+              <SortableCard key={lead.id} lead={lead} onMoveClick={onMoveClick} />
             ))}
           </div>
         </SortableContext>
@@ -92,6 +94,8 @@ export default function Pipeline() {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState(null);
   const [error, setError] = useState('');
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -115,6 +119,33 @@ export default function Pipeline() {
   function findColumnForLead(leadId) {
     const lead = leads.find((l) => l.id === leadId);
     return lead?.status;
+  }
+
+  async function handleMoveToStatus(newStatus) {
+    if (!selectedLead || selectedLead.status === newStatus) {
+      setSelectedLead(null);
+      return;
+    }
+
+    setUpdatingStatus(true);
+    try {
+      const oldStatus = selectedLead.status;
+      
+      // Optimistic update
+      setLeads((prev) =>
+        prev.map((l) => (l.id === selectedLead.id ? { ...l, status: newStatus } : l))
+      );
+      
+      await api.put(`/leads/${selectedLead.id}`, { status: newStatus });
+      setSelectedLead(null);
+    } catch {
+      // Revert on failure
+      setLeads((prev) =>
+        prev.map((l) => (l.id === selectedLead.id ? { ...l, status: selectedLead.status } : l))
+      );
+    } finally {
+      setUpdatingStatus(false);
+    }
   }
 
   async function handleDragEnd(event) {
@@ -190,7 +221,7 @@ export default function Pipeline() {
           <div className="flex gap-4 min-w-max">
             {COLUMNS.map((col) => {
               const colLeads = leads.filter((l) => l.status === col.id);
-              return <Column key={col.id} column={col} leads={colLeads} />;
+              return <Column key={col.id} column={col} leads={colLeads} onMoveClick={setSelectedLead} />;
             })}
           </div>
 
@@ -199,6 +230,51 @@ export default function Pipeline() {
           </DragOverlay>
         </DndContext>
       </div>
+
+      {/* Mobile Move Modal */}
+      {selectedLead && (
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50 sm:hidden">
+          <div className="bg-white w-full rounded-t-2xl p-0">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between rounded-t-2xl">
+              <h3 className="font-semibold text-gray-900">{selectedLead.nome}</h3>
+              <button
+                onClick={() => setSelectedLead(null)}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="px-4 py-3 space-y-2 max-h-96 overflow-y-auto">
+              {COLUMNS.map((col) => (
+                <button
+                  key={col.id}
+                  onClick={() => handleMoveToStatus(col.id)}
+                  disabled={updatingStatus || selectedLead.status === col.id}
+                  className={`w-full px-4 py-3 rounded-lg flex items-center justify-between text-sm font-medium transition-colors ${
+                    selectedLead.status === col.id
+                      ? 'bg-gray-100 text-gray-600'
+                      : `${col.light} text-gray-900 hover:opacity-80`
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <span>{col.label}</span>
+                  {selectedLead.status !== col.id && <ChevronRight className="w-4 h-4" />}
+                </button>
+              ))}
+            </div>
+
+            <div className="border-t border-gray-200 p-4 bg-gray-50 rounded-b-2xl">
+              <button
+                onClick={() => setSelectedLead(null)}
+                className="w-full px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
