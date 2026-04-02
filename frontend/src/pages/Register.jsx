@@ -2,23 +2,31 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function Login() {
+export default function Register() {
+  const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { register } = useAuth();
   const navigate = useNavigate();
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+
+    if (password !== confirm) {
+      setError('As senhas não coincidem.');
+      return;
+    }
+
     setLoading(true);
     try {
-      await login(email, password);
+      await register(nome, email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Credenciais inválidas. Tente novamente.');
+      setError(err.response?.data?.message || 'Erro ao criar conta. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -29,7 +37,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white">TemplatesHub CRM</h1>
-          <p className="text-indigo-300 mt-2">Faça login para continuar</p>
+          <p className="text-indigo-300 mt-2">Crie sua conta</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
@@ -40,6 +48,20 @@ export default function Login() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Nome
+              </label>
+              <input
+                type="text"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                required
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                placeholder="Seu nome"
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 E-mail
@@ -63,6 +85,22 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                placeholder="••••••••"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Confirmar senha
+              </label>
+              <input
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                required
+                minLength={6}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
                 placeholder="••••••••"
               />
@@ -73,14 +111,14 @@ export default function Login() {
               disabled={loading}
               className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
-              {loading ? 'Entrando...' : 'Entrar'}
+              {loading ? 'Criando conta...' : 'Criar conta'}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-600">
-            Não tem uma conta?{' '}
-            <Link to="/register" className="text-indigo-600 hover:text-indigo-700 font-medium">
-              Criar conta
+            Já tem uma conta?{' '}
+            <Link to="/login" className="text-indigo-600 hover:text-indigo-700 font-medium">
+              Fazer login
             </Link>
           </p>
         </div>

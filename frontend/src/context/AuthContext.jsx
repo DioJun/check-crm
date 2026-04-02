@@ -14,6 +14,16 @@ export function AuthProvider({ children }) {
   });
   const [token, setToken] = useState(() => localStorage.getItem('crm_token'));
 
+  async function register(nome, email, password) {
+    const response = await api.post('/auth/register', { nome, email, senha: password });
+    const { token: newToken, user: newUser } = response.data;
+    localStorage.setItem('crm_token', newToken);
+    localStorage.setItem('crm_user', JSON.stringify(newUser));
+    setToken(newToken);
+    setUser(newUser);
+    return response.data;
+  }
+
   async function login(email, password) {
     const response = await api.post('/auth/login', { email, senha: password });
     const { token: newToken, user: newUser } = response.data;
@@ -34,7 +44,7 @@ export function AuthProvider({ children }) {
   const isAuthenticated = Boolean(token);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );
