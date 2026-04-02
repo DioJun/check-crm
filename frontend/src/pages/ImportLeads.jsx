@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Upload, ArrowRight, Check, AlertCircle } from 'lucide-react';
+import { Upload, ArrowRight, Check, AlertCircle, MapPin } from 'lucide-react';
 import api from '../services/api';
 
 export default function ImportLeads() {
@@ -12,6 +12,7 @@ export default function ImportLeads() {
   // Data from spreadsheet
   const [spreadsheetData, setSpreadsheetData] = useState(null);
   const [columns, setColumns] = useState([]);
+  const [isGoogleMaps, setIsGoogleMaps] = useState(false);
 
   // Mapping state
   const [mapping, setMapping] = useState({
@@ -21,6 +22,9 @@ export default function ImportLeads() {
     servico: '',
     origem: '',
   });
+
+  // Google Maps cities
+  const [cities, setCities] = useState({});
 
   async function handleFileSelect(e) {
     const selected = e.target.files?.[0];
@@ -64,8 +68,20 @@ export default function ImportLeads() {
       });
 
       setSpreadsheetData(res.data.data);
-      setColumns(res.data.columns);
-      setStep(2);
+      setColumns(res.data.columns || []);
+      setIsGoogleMaps(res.data.isGoogleMaps);
+
+      if (res.data.isGoogleMaps) {
+        // Inicializar cities object
+        const citiesObj = {};
+        res.data.data.forEach((_, idx) => {
+          citiesObj[idx] = '';
+        });
+        setCities(citiesObj);
+        setStep(2);
+      } else {
+        setStep(2);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao processar arquivo');
     } finally {
@@ -74,11 +90,19 @@ export default function ImportLeads() {
   }
 
   async function handleImport() {
-    if (!mapping.nome || !mapping.telefone) {
-      setError('Você deve mapear pelo menos Nome e Telefone');
-      return;
+    if (isGoogleMaps) {
+      // Para Google Maps, não é obrigatório ter telefone
+      return handleGoogleMapsImport();
+    } else {
+      if (!mapping.nome || !mapping.telefone) {
+        setError('Você deve mapear pelo menos Nome e Telefone');
+        return;
+      }
+      return handleNormalImport();
     }
+  }
 
+  async function handleNormalImport() {
     setLoading(true);
     setError('');
     try {
@@ -96,22 +120,44 @@ export default function ImportLeads() {
     }
   }
 
+  async function handleGoogleMapsImport() {
+    setLoading(true);
+    setError('');
+    try {
+      const citiesArray = spreadsheetData.map((_, idx) => cities[idx] || '');
+      
+      const res = await api.post('/leads/import-google-maps', {
+        data: spreadsheetData,
+        cities: citiesArray
+      });
+
+      setSuccess(res.data.message || 'Leads importados com sucesso');
+      setStep(4);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao importar leads');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function handleReset() {
     setStep(1);
     setFile(null);
     setSpreadsheetData(null);
     setColumns([]);
+    setIsGoogleMaps(false);
     setMapping({ nome: '', telefone: '', cidade: '', servico: '', origem: '' });
+    setCities({});
     setError('');
     setSuccess('');
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Importar Leads</h1>
         <p className="text-gray-500 mt-2">
-          Importe leads de uma planilha Excel ou CSV
+          Importe leads de uma planilha Excel, CSV ou diretamente do Google Maps
         </p>
       </div>
 
@@ -158,7 +204,7 @@ export default function ImportLeads() {
               Selecione seu arquivo
             </h3>
             <p className="text-gray-500 text-sm mb-6">
-              Arraste ou clique para selecionar um arquivo Excel (.xlsx, .xls) ou CSV
+              Suporta Excel (.xlsx, .xls), CSV ou Exportação do Google Maps
             </p>
             <input
               type="file"
@@ -193,8 +239,74 @@ export default function ImportLeads() {
         </div>
       )}
 
-      {/* Step 2: Mapping */}
-      {step === 2 && (
+      {/* Step 2A: Google Maps Mapping */}
+      {step === 2 && isGoogleMaps && (
+        <div className="bg-white rounded-lg border border-gray-200 p-8">
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+            <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-blue-900">Google Maps detectado!</p>
+              <p className="text-sm text-blue-800 mt-1">
+                {spreadsheetData?.length || 0} negócios encontrados. Adicione a cidade (opcional) para cada um.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+            {spreadsheetData?.map((lead, idx) => (
+              <div key={idx} className="border border-gray-200 rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Nome</p>
+                    <p className="text-gray-900 font-semibold">{lead.nome}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Serviço</p>
+                    <p className="text-gray-600">{lead.servico}</p>
+                  </div>
+                  {lead.avaliacao && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Avaliação</p>
+                      <p className="text-yellow-600 font-medium">⭐ {lead.avaliacao} ({lead.reviews} reviews)</p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cidade (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={cities[idx] || ''}
+                      onChange={(e) => setCities({ ...cities, [idx]: e.target.value })}
+                      placeholder="Ex: São Paulo"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 flex justify-between">
+            <button
+              onClick={() => setStep(1)}
+              className="px-6 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors"
+            >
+              Voltar
+            </button>
+            <button
+              onClick={() => setStep(3)}
+              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+            >
+              Próximo
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2B: Normal Spreadsheet Mapping */}
+      {step === 2 && !isGoogleMaps && (
         <div className="bg-white rounded-lg border border-gray-200 p-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">
             Mapear colunas da planilha
@@ -284,17 +396,22 @@ export default function ImportLeads() {
 
           <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6 mb-6">
             <p className="text-indigo-900">
-              Você está prestes a importar <strong>{spreadsheetData?.length || 0} leads</strong> com o seguinte mapeamento:
+              Você está prestes a importar <strong>{spreadsheetData?.length || 0} leads</strong>
+              {!isGoogleMaps && (
+                <>
+                  {' '}com o seguinte mapeamento:
+                  <ul className="mt-4 space-y-2">
+                    {Object.entries(mapping).map(([key, col]) => (
+                      col && (
+                        <li key={key} className="text-sm text-indigo-800">
+                          <strong>{key}:</strong> {col}
+                        </li>
+                      )
+                    ))}
+                  </ul>
+                </>
+              )}
             </p>
-            <ul className="mt-4 space-y-2">
-              {Object.entries(mapping).map(([key, col]) => (
-                col && (
-                  <li key={key} className="text-sm text-indigo-800">
-                    <strong>{key}:</strong> {col}
-                  </li>
-                )
-              ))}
-            </ul>
           </div>
 
           <div className="mt-8 flex justify-between">

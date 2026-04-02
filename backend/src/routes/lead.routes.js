@@ -9,6 +9,7 @@ router.use(authMiddleware);
 // Rotas de upload de planilha
 router.post('/upload', spreadsheetController.upload, spreadsheetController.parseSpreadsheet);
 router.post('/import-spreadsheet', spreadsheetController.importFromSpreadsheet);
+router.post('/import-google-maps', spreadsheetController.importGoogleMapsLeads);
 
 router.get('/stats', leadController.getStats);
 router.get('/', leadController.getAll);

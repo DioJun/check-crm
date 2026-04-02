@@ -12,6 +12,14 @@
         "/^cd \"c:\\\\Users\\\\dioni\\\\OneDrive\\\\Documentos\\\\dev\\\\check-crm\\\\backend\" ; node node_modules/prisma/build/index\\.js db push$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^cd \"c:\\\\Users\\\\dioni\\\\OneDrive\\\\Documentos\\\\dev\\\\check-crm\" ; node -e \"\nconst XLSX = require\\('xlsx'\\);\nconst wb = XLSX\\.readFile\\('c:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\dioni\\\\\\\\\\\\\\\\OneDrive\\\\\\\\\\\\\\\\Documentos\\\\\\\\\\\\\\\\Checkmate Code Solutions\\\\\\\\\\\\\\\\Manicure leads\\.xlsx'\\);\nconsole\\.log\\('Sheets:', wb\\.SheetNames\\);\nconst ws = wb\\.Sheets\\[wb\\.SheetNames\\[0\\]\\];\nconst data = XLSX\\.utils\\.sheet_to_json\\(ws\\);\nconsole\\.log\\('Primeiras 2 linhas:'\\);\nconsole\\.log\\(JSON\\.stringify\\(data\\.slice\\(0, 2\\), null, 2\\)\\);\nconsole\\.log\\('Total de linhas:', data\\.length\\);\nconsole\\.log\\('Colunas:', Object\\.keys\\(data\\[0\\] \\|\\| \\{\\}\\)\\);\n\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd \"c:\\\\Users\\\\dioni\\\\OneDrive\\\\Documentos\\\\dev\\\\check-crm\\\\backend\" ; node -e \"\nconst XLSX = require\\('xlsx'\\);\nconst wb = XLSX\\.readFile\\('c:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\dioni\\\\\\\\\\\\\\\\OneDrive\\\\\\\\\\\\\\\\Documentos\\\\\\\\\\\\\\\\Checkmate Code Solutions\\\\\\\\\\\\\\\\Manicure leads\\.xlsx'\\);\nconsole\\.log\\('Sheets:', wb\\.SheetNames\\);\nconst ws = wb\\.Sheets\\[wb\\.SheetNames\\[0\\]\\];\nconst data = XLSX\\.utils\\.sheet_to_json\\(ws\\);\nconsole\\.log\\('Primeiras 2 linhas:'\\);\nconsole\\.log\\(JSON\\.stringify\\(data\\.slice\\(0, 2\\), null, 2\\)\\);\nconsole\\.log\\('Total de linhas:', data\\.length\\);\nconsole\\.log\\('Colunas:', Object\\.keys\\(data\\[0\\] \\|\\| \\{\\}\\)\\);\n\"$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }
