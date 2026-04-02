@@ -110,7 +110,47 @@ PORT=3001
 VITE_API_URL=http://localhost:3001/api
 ```
 
-## 📡 API
+## 🚀 Deploy no Vercel
+
+O projeto é composto por dois apps independentes. Cada um é implantado como um **projeto Vercel separado**.
+
+### Backend (API)
+
+1. Crie um projeto Vercel apontando para a pasta `backend/` do repositório
+   - **Root Directory**: `backend`
+   - **Build Command**: `npm run vercel-build` (executa `prisma generate` automaticamente)
+   - **Output Directory**: *(deixe em branco)*
+   - **Framework Preset**: Other
+
+2. Configure as **Environment Variables** no painel do Vercel:
+   | Variável | Valor |
+   |----------|-------|
+   | `DATABASE_URL` | URL de conexão PostgreSQL (ex: Supabase connection pooler) |
+   | `JWT_SECRET` | Chave secreta aleatória e longa |
+   | `CORS_ORIGIN` | URL do frontend (ex: `https://templateshub-crm.vercel.app`) |
+
+3. Após o deploy, copie a URL da API (ex: `https://templateshub-api.vercel.app`).
+
+> **Dica:** Use o Supabase como banco de dados — é gratuito e compatível com Vercel. Prefira a **connection string com pooling** (porta 6543) para evitar esgotamento de conexões em serverless.
+
+### Frontend
+
+1. Crie um segundo projeto Vercel apontando para a pasta `frontend/`
+   - **Root Directory**: `frontend`
+   - **Framework Preset**: Vite (detectado automaticamente)
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+
+2. Configure as **Environment Variables** no painel do Vercel:
+   | Variável | Valor |
+   |----------|-------|
+   | `VITE_API_URL` | URL da API do backend (ex: `https://templateshub-api.vercel.app/api`) |
+
+3. Após o deploy, atualize `CORS_ORIGIN` no projeto do backend com a URL do frontend e faça um re-deploy.
+
+---
+
+
 
 ### Autenticação
 | Método | Rota | Descrição |
