@@ -71,4 +71,17 @@ async function importLeads(req, res) {
   }
 }
 
-module.exports = { getAll, getStats, getById, create, update, delete: deleteLead, importLeads };
+async function deleteMultiple(req, res) {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'O campo "ids" deve ser um array não vazio' });
+    }
+    const result = await leadService.deleteMultiple(ids);
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+module.exports = { getAll, getStats, getById, create, update, delete: deleteLead, importLeads, deleteMultiple };

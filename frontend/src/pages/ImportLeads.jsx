@@ -28,6 +28,9 @@ export default function ImportLeads() {
   const [singleCity, setSingleCity] = useState('');
   const [whatsappStatus, setWhatsappStatus] = useState({});
   const [siteStatus, setSiteStatus] = useState({});
+  const [duplicates, setDuplicates] = useState([]);
+  const [sites, setSites] = useState({});
+  const [telefones, setTelefones] = useState({});
 
   async function handleFileSelect(e) {
     const selected = e.target.files?.[0];
@@ -74,8 +77,18 @@ export default function ImportLeads() {
       setColumns(res.data.columns || []);
       setIsGoogleMaps(res.data.isGoogleMaps);
 
+      // Verificar duplicatas
+      try {
+        const dupRes = await api.post('/leads/check-duplicates', {
+          leads: res.data.data
+        });
+        setDuplicates(dupRes.data.duplicates || []);
+      } catch {
+        // Se a verificação falhar, continua mesmo assim
+        setDuplicates([]);
+      }
+
       if (res.data.isGoogleMaps) {
-        // Inicializar com cidade vazia (será preenchida uma única vez)
         setSingleCity('');
         setStep(2);
       } else {
@@ -132,8 +145,15 @@ export default function ImportLeads() {
       // Criar array de site para todos os leads (vistos até 10)
       const siteArray = spreadsheetData.map((_, idx) => siteStatus[idx] || false);
       
+      // Adicionar telefones e sites aos dados
+      const dataWithMetadata = spreadsheetData.map((lead, idx) => ({
+        ...lead,
+        telefone: telefones[idx] || lead.telefone || '',
+        site: sites[idx] || ''
+      }));
+      
       const res = await api.post('/leads/import-google-maps', {
-        data: spreadsheetData,
+        data: dataWithMetadata,
         cities: citiesArray,
         hasWhatsapp: whatsappArray,
         hasSite: siteArray
@@ -158,6 +178,9 @@ export default function ImportLeads() {
     setSingleCity('');
     setWhatsappStatus({});
     setSiteStatus({});
+    setDuplicates([]);
+    setSites({});
+    setTelefones({});
     setError('');
     setSuccess('');
   }
@@ -262,6 +285,18 @@ export default function ImportLeads() {
             </div>
           </div>
 
+          {duplicates.length > 0 && (
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-yellow-900">{duplicates.length} duplicata(s) detectada(s)</p>
+                <p className="text-sm text-yellow-800 mt-1">
+                  {duplicates.map((d) => d.nome).join(', ')} já existem no sistema.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Qual é a cidade desses leads?
@@ -280,37 +315,56 @@ export default function ImportLeads() {
 
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Preview dos negócios a importar:</h3>
-            <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
+            <div className="space-y-3 max-h-96 overflow-y-auto mb-4">
               {spreadsheetData?.slice(0, 10).map((lead, idx) => (
-                <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                  <div className="flex items-start justify-between gap-4">
+                <div key={idx} className={`border rounded-lg p-3 ${duplicates.some(d => d.idx === idx) ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="flex items-start justify-between gap-4 mb-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 text-sm">{lead.nome}</p>
                       <p className="text-xs text-gray-600 mt-1">{lead.servico}</p>
                       {lead.avaliacao && (
                         <p className="text-xs text-yellow-600 mt-1">⭐ {lead.avaliacao} ({lead.reviews})</p>
                       )}
+                      {duplicates.some(d => d.idx === idx) && (
+                        <p className="text-xs text-red-600 mt-2 font-medium">⚠️ Duplicata detectada</p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={whatsappStatus[idx] || false}
-                          onChange={(e) => setWhatsappStatus({...whatsappStatus, [idx]: e.target.checked})}
-                          className="w-4 h-4 rounded border-gray-300"
-                        />
-                        <span className="text-xs text-gray-600">WhatsApp</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={siteStatus[idx] || false}
-                          onChange={(e) => setSiteStatus({...siteStatus, [idx]: e.target.checked})}
-                          className="w-4 h-4 rounded border-gray-300"
-                        />
-                        <span className="text-xs text-gray-600">Site</span>
-                      </label>
-                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <input
+                      type="tel"
+                      placeholder="Telefone"
+                      value={telefones[idx] || ''}
+                      onChange={(e) => setTelefones({...telefones, [idx]: e.target.value})}
+                      className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <input
+                      type="url"
+                      placeholder="Site (https://...)"
+                      value={sites[idx] || ''}
+                      onChange={(e) => setSites({...sites, [idx]: e.target.value})}
+                      className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={whatsappStatus[idx] || false}
+                        onChange={(e) => setWhatsappStatus({...whatsappStatus, [idx]: e.target.checked})}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                      <span className="text-xs text-gray-600">WhatsApp</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={siteStatus[idx] || false}
+                        onChange={(e) => setSiteStatus({...siteStatus, [idx]: e.target.checked})}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                      <span className="text-xs text-gray-600">Tem Site</span>
+                    </label>
                   </div>
                 </div>
               ))}

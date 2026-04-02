@@ -219,7 +219,8 @@ async function importGoogleMapsLeads(req, res) {
             avaliacao: lead.avaliacao,
             reviews: lead.reviews,
             temWhatsapp: temWhatsapp || (telefone ? true : false), // Se tiver telefone, assume que tem WhatsApp
-            temSite: temSite
+            temSite: temSite,
+            site: lead.site || ''
           };
         }
         return null;
@@ -241,9 +242,80 @@ async function importGoogleMapsLeads(req, res) {
   }
 }
 
+async function checkDuplicates(req, res) {
+  try {
+    const { leads } = req.body;
+
+    if (!Array.isArray(leads) || leads.length === 0) {
+      return res.status(400).json({ error: 'Dados inválidos' });
+    }
+
+    // Normalizar telefones
+    const leadsDuplicateInfo = leads.map((lead, idx) => {
+      let telefone = '';
+      if (lead.telefone && lead.telefone.trim()) {
+        telefone = lead.telefone.replace(/\D/g, '');
+        if (!telefone.startsWith('55')) {
+          telefone = '55' + telefone;
+        }
+        if (!telefone.startsWith('+')) {
+          telefone = '+' + telefone;
+        }
+      }
+      
+      return {
+        idx,
+        nome: lead.nome,
+        telefone,
+      };
+    });
+
+    // Buscar leads existentes por telefone
+    const telefonesComValor = leadsDuplicateInfo
+      .filter(l => l.telefone)
+      .map(l => l.telefone);
+    
+    let existingLeads = [];
+    if (telefonesComValor.length > 0) {
+      const prisma = require('../lib/prisma');
+      existingLeads = await prisma.lead.findMany({
+        where: { telefone: { in: telefonesComValor } },
+        select: { id: true, nome: true, telefone: true }
+      });
+    }
+
+    // Criar mapa de telefones existentes
+    const existingMap = new Map();
+    existingLeads.forEach(lead => {
+      if (lead.telefone) {
+        existingMap.set(lead.telefone, lead);
+      }
+    });
+
+    // Marcar duplicatas
+    const duplicates = leadsDuplicateInfo
+      .filter(l => l.telefone && existingMap.has(l.telefone))
+      .map(l => ({
+        idx: l.idx,
+        nome: l.nome,
+        telefone: l.telefone,
+        existingLead: existingMap.get(l.telefone)
+      }));
+
+    return res.json({
+      totalLeads: leads.length,
+      duplicateCount: duplicates.length,
+      duplicates: duplicates
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 module.exports = { 
   upload: upload.single('file'), 
   parseSpreadsheet, 
   importFromSpreadsheet,
-  importGoogleMapsLeads
+  importGoogleMapsLeads,
+  checkDuplicates
 };

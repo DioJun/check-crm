@@ -99,4 +99,8 @@ async function importLeads(leads) {
   return { imported: toInsert.length, skipped, total: normalized.length };
 }
 
-module.exports = { getAll, getById, create, update, delete: deleteLead, getDashboardStats, importLeads };
+async function deleteMultiple(ids) {
+  return leadRepository.deleteMany(ids);
+}
+
+module.exports = { getAll, getById, create, update, delete: deleteLead, getDashboardStats, importLeads, deleteMultiple };

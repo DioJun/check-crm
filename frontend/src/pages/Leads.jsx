@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Eye, Pencil, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, ChevronLeft, ChevronRight, Upload, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/ui/StatusBadge';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
@@ -30,6 +30,10 @@ export default function Leads() {
   // Pagination
   const [page, setPage] = useState(1);
   const perPage = 10;
+
+  // Selection
+  const [selected, setSelected] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchLeads();
@@ -62,6 +66,42 @@ export default function Leads() {
     fetchLeads();
   }
 
+  function toggleSelectAll() {
+    if (selected.size === paginated.length && paginated.length > 0) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(paginated.map((l) => l.id)));
+    }
+  }
+
+  function toggleSelect(id) {
+    const newSelected = new Set(selected);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelected(newSelected);
+  }
+
+  async function handleDeleteSelected() {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Tem certeza que deseja deletar ${selected.size} lead(s)?`)) return;
+
+    setDeleting(true);
+    try {
+      await api.delete('/leads', {
+        data: { ids: Array.from(selected) }
+      });
+      setSelected(new Set());
+      fetchLeads();
+    } catch {
+      setError('Erro ao deletar leads selecionados');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const cidades = [...new Set(leads.map((l) => l.cidade).filter(Boolean))].sort();
   const servicos = [...new Set(leads.map((l) => l.servico).filter(Boolean))].sort();
 
@@ -90,6 +130,16 @@ export default function Leads() {
           <p className="text-gray-500 text-sm mt-1">{filtered.length} leads encontrados</p>
         </div>
         <div className="flex gap-3">
+          {selected.size > 0 && (
+            <button
+              onClick={handleDeleteSelected}
+              disabled={deleting}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-medium text-sm rounded-lg transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Deletar {selected.size}
+            </button>
+          )}
           <button
             onClick={() => navigate('/import-leads')}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium text-sm rounded-lg transition-colors"
@@ -150,6 +200,14 @@ export default function Leads() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    <input
+                      type="checkbox"
+                      checked={selected.size === paginated.length && paginated.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+                    />
+                  </th>
                   {['Nome', 'Telefone', 'Cidade', 'Serviço', 'Status', 'Origem', 'Data', 'Ações'].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                       {h}
@@ -159,7 +217,15 @@ export default function Leads() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {paginated.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={lead.id} className={`transition-colors ${selected.has(lead.id) ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}>
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(lead.id)}
+                        onChange={() => toggleSelect(lead.id)}
+                        className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3 font-medium text-gray-900">{lead.nome}</td>
                     <td className="px-4 py-3 text-gray-600">{lead.telefone}</td>
                     <td className="px-4 py-3 text-gray-600">{lead.cidade || '-'}</td>

@@ -10,6 +10,7 @@ router.use(authMiddleware);
 router.post('/upload', spreadsheetController.upload, spreadsheetController.parseSpreadsheet);
 router.post('/import-spreadsheet', spreadsheetController.importFromSpreadsheet);
 router.post('/import-google-maps', spreadsheetController.importGoogleMapsLeads);
+router.post('/check-duplicates', spreadsheetController.checkDuplicates);
 
 router.get('/stats', leadController.getStats);
 router.get('/', leadController.getAll);
@@ -18,5 +19,6 @@ router.post('/', leadController.create);
 router.post('/import', leadController.importLeads);
 router.put('/:id', leadController.update);
 router.delete('/:id', leadController.delete);
+router.delete('/', leadController.deleteMultiple);
 
 module.exports = router;
