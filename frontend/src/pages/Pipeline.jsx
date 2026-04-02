@@ -43,11 +43,14 @@ function LeadCard({ lead, isDragging = false, onMoveClick }) {
         </div>
         <button
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
+            console.log('Botão clicado, abrindo modal para:', lead.nome);
             onMoveClick(lead);
           }}
-          className="flex-shrink-0 p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+          className="flex-shrink-0 p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600 pointer-events-auto z-10 relative"
           title="Mover para outro status"
+          type="button"
         >
           <MoreVertical className="w-4 h-4" />
         </button>
