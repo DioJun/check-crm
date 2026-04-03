@@ -34,12 +34,9 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Log CORS info on startup
-console.log('🔐 CORS Configurado para origins:');
+// Log CORS info on startup (simplified for Vercel)
 if (process.env.CORS_ORIGIN) {
-  process.env.CORS_ORIGIN.split(',').forEach(o => console.log(`  ✓ ${o.trim()}`));
-} else {
-  console.log('  ! Nenhum origin específico. Usando localhost.');
+  console.log('CORS configured for:', process.env.CORS_ORIGIN);
 }
 
 app.use(express.json());
