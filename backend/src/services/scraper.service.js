@@ -248,7 +248,7 @@ class ScraperService {
    * @returns {Promise<Array>} Lista de resultados encontrados
    */
   static async searchGoogleMaps(searchTerm) {
-    console.log(`🔎 Buscando: "${searchTerm}"`);
+    console.log(`🔎 Iniciando busca: "${searchTerm}"`);
     
     if (!searchTerm || searchTerm.trim().length === 0) {
       throw new Error('Termo de pesquisa inválido');
@@ -262,8 +262,7 @@ class ScraperService {
     }
 
     try {
-      // Usar Puppeteer para fazer a busca
-      console.log('⏳ Iniciando Puppeteer (pode levar 30-45s)...');
+      console.log('🤖 Tentando Puppeteer (timeout: 60s)...');
       const results = await this.searchWithPuppeteer(searchTerm);
 
       // Cachear por 24 horas
@@ -271,23 +270,12 @@ class ScraperService {
       setTimeout(() => scrapCache.delete(cacheKey), 24 * 60 * 60 * 1000);
 
       return results;
+      
     } catch (puppeteerError) {
       console.error('❌ Puppeteer falhou:', puppeteerError.message);
+      console.error('Stack:', puppeteerError.stack?.substring(0, 500));
       
-      // Fallback: tentar método leve
-      try {
-        console.log('🌐 Tentando alternativa sem Puppeteer...');
-        const results = await this.searchWithAlternativeMethod(searchTerm);
-        
-        // Cachear por 24 horas
-        scrapCache.set(cacheKey, results);
-        setTimeout(() => scrapCache.delete(cacheKey), 24 * 60 * 60 * 1000);
-
-        return results;
-      } catch (altError) {
-        console.error('❌ Alternativa também falhou:', altError.message);
-        throw new Error('Nenhum resultado encontrado. Tente um termo diferente ou verifique sua conexão.');
-      }
+      throw new Error(`Puppeteer error: ${puppeteerError.message || 'Timeout ou erro desconhecido'}. Verifique se pode usar a busca por URL do Google Maps ao invés.`);
     }
   }
 
@@ -335,8 +323,14 @@ class ScraperService {
     console.log('🤖 Iniciando busca com Puppeteer...');
     
     try {
-      const puppeteer = require('puppeteer');
+      let puppeteer;
+      try {
+        puppeteer = require('puppeteer');
+      } catch (e) {
+        throw new Error('Puppeteer não instalado no ambiente');
+      }
 
+      console.log('📲 Lançando browser (Chrome)...');
       const browser = await puppeteer.launch({
         headless: 'new',
         args: [
@@ -344,8 +338,11 @@ class ScraperService {
           '--disable-setuid-sandbox',
           '--disable-gpu',
           '--disable-dev-shm-usage',
-          '--disable-extensions'
-        ]
+          '--disable-extensions',
+          '--disable-web-resources',
+          '--disable-component-extensions-with-background-pages',
+        ],
+        timeout: 60000
       });
 
       const page = await browser.newPage();
@@ -354,70 +351,51 @@ class ScraperService {
       // Construir URL de pesquisa do Google Maps
       const searchUrl = `https://www.google.com.br/maps/search/${encodeURIComponent(searchTerm)}`;
       
-      console.log(`📍 Acessando: ${searchUrl}`);
-      await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+      console.log(`📍 Acessando: ${searchUrl.substring(0, 80)}...`);
+      
+      // Navegação com timeout maior
+      await page.goto(searchUrl, { 
+        waitUntil: 'networkidle2', 
+        timeout: 60000 
+      });
 
-      // Dar tempo para renderizar resultados
-      await page.waitForTimeout(4000);
+      console.log('⏳ Aguardando renderização...');
+      await page.waitForTimeout(5000);
 
-      // Extrair lista de resultados com múltiplas estratégias
+      // Extrair lista de resultados
       const results = await page.evaluate(() => {
         const items = [];
         
-        // Estratégia 1: role="option" (Google Maps padrão)
+        // Estratégia 1: role="option"
         let searchResults = document.querySelectorAll('[role="option"]');
         
-        // Estratégia 2: Divs com dados específicos
-        if (searchResults.length === 0) {
-          searchResults = document.querySelectorAll('div[jsaction*="click"]');
-        }
+        console.log(`[page] Encontrados ${searchResults.length} com role=option`);
         
-        // Estratégia 3: Buscar por jspb-v2
         if (searchResults.length === 0) {
-          searchResults = document.querySelectorAll('[data-result-index]');
+          // Estratégia 2: outros seletores
+          searchResults = document.querySelectorAll('[jsaction*="click"][data-index]');
+          console.log(`[page] Tentativa 2: ${searchResults.length}`);
         }
 
-        console.log(`Encontrados ${searchResults.length} resultados`);
-        
         searchResults.forEach((result, index) => {
-          if (index < 20) { // Limitar a 20 resultados
+          if (index < 20 && result.textContent.length > 10) {
             try {
-              // Extrair nome
-              const titleElem = result.querySelector('div[role="img"], .TkSaBd, [data-name], span');
-              const nome = titleElem?.textContent?.trim() || '';
+              const text = result.innerText;
+              const lines = text.split('\n').filter(l => l.trim());
               
-              // Extrair endereço
-              const addressElems = result.querySelectorAll('div span');
-              let endereco = '';
-              addressElems.forEach(el => {
-                const text = el.textContent?.toLowerCase() || '';
-                if (text.includes('rua') || text.includes('avenida') || text.includes('joinville') || text.includes(',')) {
-                  endereco = el.textContent?.trim() || '';
-                }
-              });
-              
-              // Extrair avaliação
-              const ratingElem = result.querySelector('[aria-label*="estrela"], [data-rating]');
-              const avaliacoes = ratingElem?.textContent?.trim() || '';
-              
-              // Extrair href se houver link
-              const linkElem = result.querySelector('a');
-              const url = linkElem?.href || '';
-              
-              if (nome && nome.length > 2) {
+              if (lines.length > 0) {
                 items.push({
-                  nome: nome.substring(0, 80),
-                  endereco: endereco.substring(0, 100) || 'Endereço não disponível',
-                  avaliacoes: avaliacoes.substring(0, 10) || '',
+                  nome: lines[0]?.substring(0, 80) || 'Unknown',
+                  endereco: lines[lines.length - 1]?.substring(0, 100) || '',
+                  avaliacoes: lines.find(l => l.includes('★')) || '',
                   website: null,
                   telefone: null,
-                  url_maps: url,
                   latitude: null,
                   longitude: null
                 });
               }
             } catch (e) {
-              console.error('Erro ao processar resultado:', e.message);
+              // ignorar
             }
           }
         });
@@ -428,14 +406,14 @@ class ScraperService {
       await browser.close();
 
       if (results.length === 0) {
-        throw new Error('Nenhum resultado encontrado com Puppeteer');
+        throw new Error(`Nenhum resultado encontrado para "${searchTerm}"`);
       }
 
-      console.log(`✅ ${results.length} resultados extraídos com Puppeteer`);
+      console.log(`✅ ${results.length} resultados extraídos`);
       return results;
 
     } catch (error) {
-      console.error('❌ Erro em searchWithPuppeteer:', error.message);
+      console.error('❌ Erro em Puppeteer:', error.message);
       throw error;
     }
   }
