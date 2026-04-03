@@ -48,8 +48,10 @@ class ScraperService {
   static isValidGoogleMapsUrl(url) {
     try {
       const parsedUrl = new URL(url);
+      // Verifica se é domínio Google (qualquer extensão) e contém 'maps' e 'place'
       return parsedUrl.hostname.includes('google') && 
-             (parsedUrl.pathname.includes('maps') || parsedUrl.search.includes('maps'));
+             parsedUrl.pathname.includes('maps') &&
+             parsedUrl.pathname.includes('place');
     } catch {
       return false;
     }
