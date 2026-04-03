@@ -647,14 +647,14 @@ export default function ImportLeads() {
           </button>
         </div>
       )}
-    </div>
 
-    {/* Google Maps Scraper Modal */}
-    {showScraper && (
-      <GoogleMapsScraper
-        onDataScraped={handleScrapedData}
-        onClose={() => setShowScraper(false)}
-      />
-    )}
+      {/* Google Maps Scraper Modal */}
+      {showScraper && (
+        <GoogleMapsScraper
+          onDataScraped={handleScrapedData}
+          onClose={() => setShowScraper(false)}
+        />
+      )}
+    </div>
   );
 }
