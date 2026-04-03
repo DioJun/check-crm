@@ -26,6 +26,13 @@ router.get('/health', (req, res) => {
  */
 router.post('/validate-url', ScraperController.validateUrl.bind(ScraperController));
 
+/**
+ * POST /scraper/search
+ * Pesquisa por termo (ex: "mecânicos em joinville")
+ * Sem autenticação por enquanto (para testes)
+ */
+router.post('/search', ScraperController.searchGoogleMaps.bind(ScraperController));
+
 // Rotas abaixo requerem autenticação
 router.use(authMiddleware);
 
@@ -40,11 +47,5 @@ router.post('/google-maps', ScraperController.scrapeGoogleMaps.bind(ScraperContr
  * Scrape de múltiplas URLs
  */
 router.post('/batch', ScraperController.scrapeBatch.bind(ScraperController));
-
-/**
- * POST /scraper/search
- * Pesquisa por termo (ex: "mecânicos em joinville")
- */
-router.post('/search', ScraperController.searchGoogleMaps.bind(ScraperController));
 
 module.exports = router;
