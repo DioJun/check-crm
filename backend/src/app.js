@@ -24,10 +24,29 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'TemplatesHub CRM Backend' });
 });
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ message: 'TemplatesHub CRM API', version: '1.0.0', health: 'ok' });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/interactions', interactionRoutes);
 app.use('/api/scraper', scraperRoutes);
+
+// 404 Handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found', path: req.path });
+});
+
+// Error Handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err.message);
+  res.status(err.status || 500).json({ 
+    error: err.message || 'Internal server error',
+    status: err.status || 500
+  });
+});
 
 // Only start the HTTP server when this file is run directly (local dev).
 // On Vercel the module is imported by api/index.js and used as a handler.
