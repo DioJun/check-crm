@@ -3,7 +3,6 @@
  * Extrai dados de negócios: nome, telefone, endereço, avaliação
  */
 
-const axios = require('axios');
 const { URLSearchParams } = require('url');
 
 // Cache em memória (em produção, usar Redis)
