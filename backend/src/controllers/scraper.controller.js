@@ -162,23 +162,33 @@ class ScraperController {
       console.log(`🔎 Buscando: "${searchTerm}"`);
 
       // Fazer busca
-      const results = await ScraperService.searchGoogleMaps(searchTerm);
+      try {
+        const results = await ScraperService.searchGoogleMaps(searchTerm);
 
-      return res.json({
-        success: true,
-        searchTerm,
-        total: results.length,
-        data: results,
-        message: `${results.length} resultados encontrados!`
-      });
+        return res.json({
+          success: true,
+          searchTerm,
+          total: results.length,
+          data: results,
+          message: `${results.length} resultados encontrados!`
+        });
+      } catch (error) {
+        console.error('❌ Erro ao buscar:', error.message);
+        
+        // Se falhar, retornar erro claro
+        return res.status(500).json({
+          success: false,
+          error: error.message || 'Erro ao fazer a busca',
+          tip: 'Verifique sua conexão e tente novamente. O Puppeteer pode estar com timeout em Vercel.'
+        });
+      }
 
     } catch (error) {
-      console.error('❌ Erro ao buscar:', error.message);
+      console.error('❌ Erro no controller:', error.message);
 
       return res.status(500).json({
         success: false,
-        error: error.message || 'Erro ao fazer a busca',
-        tip: 'Certifique-se de ter Puppeteer instalado: npm install puppeteer'
+        error: error.message || 'Erro ao fazer a busca'
       });
     }
   }

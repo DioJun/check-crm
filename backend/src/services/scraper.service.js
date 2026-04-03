@@ -264,6 +264,7 @@ class ScraperService {
 
     try {
       // Usar Puppeteer para fazer a busca
+      console.log('⏳ Iniciando Puppeteer (pode levar 30-45s)...');
       const results = await this.searchWithPuppeteer(searchTerm);
 
       // Cachear por 24 horas
@@ -271,9 +272,59 @@ class ScraperService {
       setTimeout(() => scrapCache.delete(cacheKey), 24 * 60 * 60 * 1000);
 
       return results;
+    } catch (puppeteerError) {
+      console.error('❌ Puppeteer falhou:', puppeteerError.message);
+      
+      // Fallback: tentar método leve
+      try {
+        console.log('🌐 Tentando alternativa sem Puppeteer...');
+        const results = await this.searchWithAlternativeMethod(searchTerm);
+        
+        // Cachear por 24 horas
+        scrapCache.set(cacheKey, results);
+        setTimeout(() => scrapCache.delete(cacheKey), 24 * 60 * 60 * 1000);
+
+        return results;
+      } catch (altError) {
+        console.error('❌ Alternativa também falhou:', altError.message);
+        throw new Error('Nenhum resultado encontrado. Tente um termo diferente ou verifique sua conexão.');
+      }
+    }
+  }
+
+  /**
+   * Método alternativo mais leve (sem Puppeteer)
+   */
+  static async searchWithAlternativeMethod(searchTerm) {
+    console.log('📡 Usando método alternativo...');
+    
+    try {
+      const fetch = require('node-fetch');
+      
+      // Tentar busca com timeout curto
+      const searchUrl = `https://www.google.com.br/maps/search/${encodeURIComponent(searchTerm)}`;
+      
+      console.log(`Acessando: ${searchUrl}`);
+      
+      const response = await fetch(searchUrl, {
+        timeout: 8000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} - Servidor não respondeu`);
+      }
+      
+      const html = await response.text();
+      
+      // Google Maps renderiza com JavaScript, fetch puro não consegue
+      console.warn('⚠️ Método leve não conseguiu extrair dados (Google Maps usa JavaScript)');
+      throw new Error('Método alternativo insuficiente para Google Maps');
+      
     } catch (error) {
-      console.error('❌ Erro ao buscar:', error.message);
-      throw error;
+      throw new Error(`Método alternativo falhou: ${error.message}`);
     }
   }
 
@@ -389,38 +440,6 @@ class ScraperService {
       throw error;
     }
   }
-
-  /**
-   * Pesquisa alternativa usando fetch + parsing HTML
-   * Mais leve que Puppeteer
-   */
-  static async searchWithHttpFetch(searchTerm) {
-    console.log('🌐 Tentando busca com fetch + parsing...');
-    
-    try {
-      const fetch = require('node-fetch');
-      const cheerio = require('cheerio');
-      
-      const searchUrl = `https://www.google.com.br/maps/search/${encodeURIComponent(searchTerm)}`;
-      
-      const response = await fetch(searchUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-      
-      const html = await response.text();
-      
-      // Google Maps usa muito JavaScript, fetch puro não consegue renderizar
-      console.warn('⚠️ Fetch sem JavaScript não consegue extrair dados do Google Maps');
-      throw new Error('Método alternativo não disponível - Puppeteer não conseguiu executar');
-      
-    } catch (error) {
-      console.error('❌ Erro em searchWithHttpFetch:', error.message);
-      throw error;
-    }
-  }
-
 
 }
 
