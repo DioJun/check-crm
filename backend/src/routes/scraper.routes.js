@@ -29,4 +29,10 @@ router.post('/google-maps', ScraperController.scrapeGoogleMaps.bind(ScraperContr
  */
 router.post('/batch', ScraperController.scrapeBatch.bind(ScraperController));
 
+/**
+ * POST /scraper/search
+ * Pesquisa por termo (ex: "mecânicos em joinville")
+ */
+router.post('/search', ScraperController.searchGoogleMaps.bind(ScraperController));
+
 module.exports = router;

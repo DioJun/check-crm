@@ -141,6 +141,47 @@ class ScraperController {
       });
     }
   }
+
+  /**
+   * POST /scraper/search
+   * Pesquisa múltiplos resultados por termo (ex: "mecânicos em joinville")
+   */
+  static async searchGoogleMaps(req, res) {
+    try {
+      const { searchTerm } = req.body;
+
+      // Validações
+      if (!searchTerm || searchTerm.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Termo de pesquisa é obrigatório',
+          exemplo: 'ex: "mecânicos em joinville"'
+        });
+      }
+
+      console.log(`🔎 Buscando: "${searchTerm}"`);
+
+      // Fazer busca
+      const results = await ScraperService.searchGoogleMaps(searchTerm);
+
+      return res.json({
+        success: true,
+        searchTerm,
+        total: results.length,
+        data: results,
+        message: `${results.length} resultados encontrados!`
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao buscar:', error.message);
+
+      return res.status(500).json({
+        success: false,
+        error: error.message || 'Erro ao fazer a busca',
+        tip: 'Certifique-se de ter Puppeteer instalado: npm install puppeteer'
+      });
+    }
+  }
 }
 
 module.exports = ScraperController;

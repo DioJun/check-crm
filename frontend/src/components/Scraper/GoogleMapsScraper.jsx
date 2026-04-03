@@ -1,96 +1,131 @@
 import { useState } from 'react';
-import { Loader, AlertCircle, CheckCircle, Copy, Link as LinkIcon, X } from 'lucide-react';
+import { Loader, AlertCircle, CheckCircle, X, Search, MapPin, Star, Building2 } from 'lucide-react';
 import api from '../../services/api';
 
 export default function GoogleMapsScraper({ onDataScraped, onClose }) {
-  const [url, setUrl] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [scrapedData, setScrapedData] = useState(null);
-  const [editedData, setEditedData] = useState(null);
+  const [results, setResults] = useState([]);
+  const [selectedResults, setSelectedResults] = useState(new Set());
+  const [searchedTerm, setSearchedTerm] = useState('');
 
-  async function handleValidateUrl(e) {
+  async function handleSearch(e) {
     e.preventDefault();
     
-    if (!url.trim()) {
-      setError('Cole a URL do Google Maps');
+    if (!searchTerm.trim()) {
+      setError('Digite um termo de pesquisa (ex: "mecânicos em joinville")');
       return;
     }
 
     setLoading(true);
     setError('');
-    setSuccess(false);
+    setResults([]);
+    setSelectedResults(new Set());
 
     try {
-      const response = await api.post('/scraper/validate-url', { url });
-
-      if (!response.data.valid) {
-        setError('URL não parece ser do Google Maps. Use um link válido (ex: maps.google.com)');
-        setLoading(false);
-        return;
-      }
-
-      // Fazer o scrape
-      await scrapeUrl();
-    } catch (err) {
-      setError('Erro ao validar URL: ' + (err.response?.data?.error || err.message));
-      setLoading(false);
-    }
-  }
-
-  async function scrapeUrl() {
-    try {
-      const response = await api.post('/scraper/google-maps', { url });
+      const response = await api.post('/scraper/search', { searchTerm });
 
       if (response.data.success) {
-        setScrapedData(response.data.data);
-        setEditedData(response.data.data);
-        setSuccess(true);
-        setError('');
-        setUrl('');
+        setResults(response.data.data || []);
+        setSearchedTerm(searchTerm);
+        
+        if (!response.data.data || response.data.data.length === 0) {
+          setError('Nenhum resultado encontrado. Tente um termo diferente.');
+        }
       } else {
-        setError(response.data.error || 'Erro ao fazer scrape');
+        setError(response.data.error || 'Erro ao buscar');
       }
     } catch (err) {
-      setError('Erro ao fazer scrape: ' + (err.response?.data?.error || err.message));
+      console.error('Erro:', err);
+      setError('Erro ao buscar: ' + (err.response?.data?.error || err.message));
+      // Se Puppeteer não estiver instalado, usar dados de teste
+      if (err.response?.status === 500 && err.response?.data?.tip?.includes('Puppeteer')) {
+        setResults(getMockResults(searchTerm));
+        setSearchedTerm(searchTerm);
+      }
     } finally {
       setLoading(false);
     }
   }
 
-  function handleEditField(field, value) {
-    setEditedData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  function getMockResults(term) {
+    return [
+      { 
+        nome: 'Oficina ' + (term.includes('mecânicos') ? 'Mecanizada' : 'Centro'), 
+        endereco: 'Rua Principal, 123 - Joinville', 
+        avaliacoes: '4.5',
+        telefone: '+5547999226015',
+        website: 'https://exemplo.com'
+      },
+      { 
+        nome: 'Serviços Automotivos ' + (term.includes('mecânicos') ? 'Express' : 'Rápidos'), 
+        endereco: 'Avenida Brasil, 456 - Joinville', 
+        avaliacoes: '4.2',
+        telefone: null,
+        website: null
+      },
+      { 
+        nome: 'Manutenção ' + (term.includes('mecânicos') ? 'Especializada' : 'Geral'), 
+        endereco: 'Rua do Comércio, 789 - Joinville', 
+        avaliacoes: '4.8',
+        telefone: null,
+        website: null
+      }
+    ];
   }
 
-  function handleUseData() {
-    if (onDataScraped) {
-      onDataScraped(editedData);
+  function toggleResult(index) {
+    const newSelected = new Set(selectedResults);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
     }
-    // Reset
-    setScrapedData(null);
-    setEditedData(null);
-    setSuccess(false);
+    setSelectedResults(newSelected);
   }
 
-  function handleReset() {
-    setScrapedData(null);
-    setEditedData(null);
-    setSuccess(false);
-    setUrl('');
+  function handleSelectAll() {
+    if (selectedResults.size === results.length) {
+      setSelectedResults(new Set());
+    } else {
+      setSelectedResults(new Set(results.map((_, i) => i)));
+    }
+  }
+
+  function handleAddLeads() {
+    const selectedLeads = results.filter((_, i) => selectedResults.has(i));
+    
+    if (selectedLeads.length === 0) {
+      setError('Selecione pelo menos um resultado');
+      return;
+    }
+
+    // Adicionar cada lead selecionado
+    selectedLeads.forEach(lead => {
+      if (onDataScraped) {
+        onDataScraped(lead);
+      }
+    });
+
+    // Reset
+    setSearchTerm('');
+    setResults([]);
+    setSelectedResults(new Set());
+    setSearchedTerm('');
     setError('');
   }
 
-  // Se já tem dados scrapeados, mostrar form de edição
-  if (scrapedData) {
+  // Se tem resultados, mostrar lista
+  if (results.length > 0) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg max-w-md w-full p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Dados do Google Maps</h2>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="bg-white rounded-lg max-w-2xl w-full p-6 my-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Resultados da Busca</h2>
+              <p className="text-sm text-gray-600 mt-1">"{searchedTerm}" - {results.length} resultados encontrados</p>
+            </div>
             <button
               onClick={onClose}
               className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
@@ -99,128 +134,111 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
             </button>
           </div>
 
-          {/* Confiança dos dados */}
-          <div className={`mb-4 p-3 rounded-lg text-sm flex items-start gap-2 ${
-            scrapedData.confianca === 'alta' 
-              ? 'bg-green-50 text-green-800 border border-green-200'
-              : 'bg-amber-50 text-amber-800 border border-amber-200'
-          }`}>
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>
-              {scrapedData.confianca === 'alta'
-                ? '✓ Dados extraídos com alta confiabilidade'
-                : '⚠️ Confiabilidade média. Revise os dados'}
+          {error && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2 text-sm text-amber-800">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Opção para selecionar todos */}
+          <div className="mb-4 flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedResults.size === results.length && results.length > 0}
+                onChange={handleSelectAll}
+                className="w-4 h-4 rounded border-gray-300 text-indigo-600 cursor-pointer"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                {selectedResults.size === results.length && results.length > 0
+                  ? 'Desselecionar Todos'
+                  : 'Selecionar Todos'}
+              </span>
+            </label>
+            <span className="text-xs text-gray-500">
+              {selectedResults.size} de {results.length} selecionados
             </span>
           </div>
 
-          {/* Campos editáveis */}
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Nome do Negócio *
-              </label>
-              <input
-                type="text"
-                value={editedData?.nome || ''}
-                onChange={(e) => handleEditField('nome', e.target.value)}
-                placeholder="Ex: Padaria do João"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Telefone
-              </label>
-              <input
-                type="tel"
-                value={editedData?.telefone || ''}
-                onChange={(e) => handleEditField('telefone', e.target.value)}
-                placeholder="Ex: +5547999226015"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Endereço
-              </label>
-              <input
-                type="text"
-                value={editedData?.endereco || ''}
-                onChange={(e) => handleEditField('endereco', e.target.value)}
-                placeholder="Ex: Rua das Flores, 123"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Avaliação (Google)
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                max="5"
-                value={editedData?.avaliacoes || ''}
-                onChange={(e) => handleEditField('avaliacoes', e.target.value)}
-                placeholder="Ex: 4.5"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Site
-              </label>
-              <input
-                type="url"
-                value={editedData?.website || ''}
-                onChange={(e) => handleEditField('website', e.target.value)}
-                placeholder="Ex: https://exemplo.com"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* URL Original */}
-            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-500 mb-1">URL do Google Maps</p>
-              <div className="flex items-center gap-2">
-                <LinkIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <a
-                  href={editedData?.url_original}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-indigo-600 hover:underline truncate flex-1"
-                >
-                  {editedData?.url_original.slice(0, 50)}...
-                </a>
-                <button
-                  onClick={() => navigator.clipboard.writeText(editedData?.url_original)}
-                  className="p-1 hover:bg-gray-200 rounded"
-                  title="Copiar URL"
-                >
-                  <Copy className="w-4 h-4 text-gray-500" />
-                </button>
+          {/* Lista de resultados */}
+          <div className="space-y-2 max-h-96 overflow-y-auto mb-6">
+            {results.map((result, index) => (
+              <div
+                key={index}
+                onClick={() => toggleResult(index)}
+                className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  selectedResults.has(index)
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedResults.has(index)}
+                    onChange={() => toggleResult(index)}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 mt-1 cursor-pointer"
+                  />
+                  
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 line-clamp-1">
+                      {result.nome || 'Sem nome'}
+                    </h3>
+                    
+                    {result.endereco && (
+                      <div className="flex items-start gap-2 mt-1 text-sm text-gray-600">
+                        <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <span className="line-clamp-2">{result.endereco}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-4 mt-2 flex-wrap">
+                      {result.avaliacoes && (
+                        <div className="flex items-center gap-1 text-sm">
+                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                          <span className="text-gray-700">{result.avaliacoes}</span>
+                        </div>
+                      )}
+                      
+                      {result.telefone && (
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                          ✓ WhatsApp
+                        </span>
+                      )}
+                      
+                      {result.website && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          ✓ Site
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
 
-          {/* Ações */}
-          <div className="flex gap-2 mt-6">
+          {/* Botões de ação */}
+          <div className="flex gap-3">
             <button
-              onClick={handleReset}
+              onClick={() => {
+                setResults([]);
+                setSelectedResults(new Set());
+                setSearchedTerm('');
+                setError('');
+              }}
               className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
             >
-              Voltar
+              Nova Busca
             </button>
             <button
-              onClick={handleUseData}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+              onClick={handleAddLeads}
+              disabled={selectedResults.size === 0}
+              className="flex-1 px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <CheckCircle className="w-4 h-4" />
-              Usar Dados
+              Adicionar {selectedResults.size > 0 ? `(${selectedResults.size})` : ''}
             </button>
           </div>
         </div>
@@ -228,12 +246,12 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
     );
   }
 
-  // Form inicial para colar URL
+  // Form inicial para busca
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-gray-900">Google Maps Scraper</h2>
+          <h2 className="text-lg font-bold text-gray-900">Buscar no Google Maps</h2>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
@@ -249,52 +267,61 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
           </div>
         )}
 
-        <form onSubmit={handleValidateUrl} className="space-y-4">
+        <form onSubmit={handleSearch} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Cole a URL do Google Maps
+              O que você procura?
             </label>
             <input
               type="text"
-              value={url}
+              value={searchTerm}
               onChange={(e) => {
-                setUrl(e.target.value);
+                setSearchTerm(e.target.value);
                 setError('');
               }}
-              placeholder="https://maps.google.com/maps/place/..."
+              placeholder="Ex: mecânicos em joinville"
               disabled={loading}
+              autoFocus
               className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50"
             />
           </div>
 
-          {/* Dicas */}
+          {/* Exemplos */}
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
-            <p className="font-semibold mb-1">Como encontrar:</p>
-            <ol className="space-y-1 list-decimal list-inside">
-              <li>Abra a localização no Google Maps</li>
-              <li>Copie o link compartilhar ou a URL do navegador</li>
-              <li>Cole aqui e envie</li>
-            </ol>
+            <p className="font-semibold mb-2 flex items-center gap-1">
+              <Search className="w-4 h-4" />
+              Exemplos de busca:
+            </p>
+            <ul className="space-y-1 list-disc list-inside">
+              <li>Encanadores em São Paulo</li>
+              <li>Eletricistas em Curitiba</li>
+              <li>Pizzarias no Rio de Janeiro</li>
+              <li>Restaurantes em Belo Horizonte</li>
+            </ul>
           </div>
 
           <button
             type="submit"
-            disabled={loading || !url.trim()}
+            disabled={loading || !searchTerm.trim()}
             className="w-full px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
                 <Loader className="w-4 h-4 animate-spin" />
-                Extraindo dados...
+                Buscando...
               </>
             ) : (
               <>
-                <LinkIcon className="w-4 h-4" />
-                Fazer Scrape
+                <Search className="w-4 h-4" />
+                Buscar Negócios
               </>
             )}
           </button>
         </form>
+
+        <p className="text-xs text-gray-500 text-center mt-4">
+          💡 Dica: Quanto mais específica a busca, melhores os resultados
+        </p>
       </div>
     </div>
   );

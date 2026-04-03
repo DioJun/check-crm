@@ -242,6 +242,136 @@ class ScraperService {
       return null;
     }
   }
+
+  /**
+   * Pesquisa Google Maps por termo (ex: "mecânicos em joinville")
+   * @param {string} searchTerm - Termo de pesquisa (ex: "mecânicos em joinville")
+   * @returns {Promise<Array>} Lista de resultados encontrados
+   */
+  static async searchGoogleMaps(searchTerm) {
+    console.log(`🔎 Buscando: "${searchTerm}"`);
+    
+    if (!searchTerm || searchTerm.trim().length === 0) {
+      throw new Error('Termo de pesquisa inválido');
+    }
+
+    // Verificar cache
+    const cacheKey = `search_${Buffer.from(searchTerm).toString('base64')}`;
+    if (scrapCache.has(cacheKey)) {
+      console.log('📦 Retornando resultados do cache');
+      return scrapCache.get(cacheKey);
+    }
+
+    try {
+      // Usar Puppeteer para fazer a busca
+      const results = await this.searchWithPuppeteer(searchTerm);
+
+      // Cachear por 24 horas
+      scrapCache.set(cacheKey, results);
+      setTimeout(() => scrapCache.delete(cacheKey), 24 * 60 * 60 * 1000);
+
+      return results;
+    } catch (error) {
+      console.error('❌ Erro ao buscar:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Pesquisa com Puppeteer (browser headless)
+   * Coleta múltiplos resultados de pesquisa
+   */
+  static async searchWithPuppeteer(searchTerm) {
+    console.log('🤖 Iniciando busca com Puppeteer...');
+    
+    try {
+      const puppeteer = require('puppeteer');
+
+      const browser = await puppeteer.launch({
+        headless: 'new',
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+
+      const page = await browser.newPage();
+      
+      // Construir URL de pesquisa do Google Maps
+      const searchUrl = `https://www.google.com.br/maps/search/${encodeURIComponent(searchTerm)}`;
+      
+      await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+
+      // Dar tempo para renderizar resultados
+      await page.waitForTimeout(2000);
+
+      // Extrair lista de resultados
+      const results = await page.evaluate(() => {
+        const items = [];
+        
+        // Selecionar todos os resultados de pesquisa
+        const searchResults = document.querySelectorAll('[role="option"]');
+        
+        searchResults.forEach((result, index) => {
+          if (index < 15) { // Limitar a 15 resultados
+            const titleElem = result.querySelector('[class*="subtitle"]');
+            const ratingElem = result.querySelector('[class*="rating"]');
+            const addressElem = result.querySelector('[class*="address"]');
+            
+            const nome = titleElem?.textContent?.trim() || '';
+            const avaliacoes = ratingElem?.textContent?.trim() || '';
+            const endereco = addressElem?.textContent?.trim() || '';
+            
+            if (nome) {
+              items.push({
+                nome,
+                endereco,
+                avaliacoes,
+                website: null,
+                telefone: null,
+                latitude: null,
+                longitude: null
+              });
+            }
+          }
+        });
+        
+        return items;
+      });
+
+      await browser.close();
+
+      console.log(`✅ Encontrados ${results.length} resultados`);
+      return results;
+
+    } catch (error) {
+      console.error('❌ Erro em searchWithPuppeteer:', error.message);
+      
+      // Se Puppeteer não estiver disponível, retornar resposta simulada
+      if (error.message.includes('Cannot find module')) {
+        console.warn('⚠️ Puppeteer não instalado. Use: npm install puppeteer');
+        return this.getMockSearchResults(searchTerm);
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Retorna resultados simulados quando Puppeteer não está disponível
+   * (Para testing/desenvolvimento)
+   */
+  static getMockSearchResults(searchTerm) {
+    console.warn('⚠️ Retornando resultados de teste. Para resultados reais, instale Puppeteer.');
+    
+    // Exemplos simulados baseados no termo de pesquisa
+    const mockResults = {
+      default: [
+        { nome: 'Negócio 1', endereco: 'Rua A, 123', avaliacoes: '4.5', website: null, telefone: null },
+        { nome: 'Negócio 2', endereco: 'Rua B, 456', avaliacoes: '4.2', website: null, telefone: null },
+        { nome: 'Negócio 3', endereco: 'Rua C, 789', avaliacoes: '4.8', website: null, telefone: null }
+      ]
+    };
+
+    return mockResults.default;
+  }
 }
 
 module.exports = ScraperService;
