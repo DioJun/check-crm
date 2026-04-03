@@ -2,59 +2,63 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-const authRoutes = require('./routes/auth.routes');
-const leadRoutes = require('./routes/lead.routes');
-const interactionRoutes = require('./routes/interaction.routes');
-const scraperRoutes = require('./routes/scraper.routes');
-
 const app = express();
 
-// Simple CORS Configuration
-const corsOptions = {
-  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-};
-
-app.use(cors(corsOptions));
+// Middleware
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
 app.use(express.json());
 
+// Basic routes (test first)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'TemplatesHub CRM Backend' });
+  res.json({ status: 'ok' });
 });
 
-// Root endpoint
 app.get('/', (req, res) => {
-  res.json({ message: 'TemplatesHub CRM API', version: '1.0.0', health: 'ok' });
+  res.json({ message: 'CRM API v1.0' });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/leads', leadRoutes);
-app.use('/api/interactions', interactionRoutes);
-app.use('/api/scraper', scraperRoutes);
+// Try loading auth routes
+try {
+  const authRoutes = require('./routes/auth.routes');
+  app.use('/api/auth', authRoutes);
+} catch (err) {
+  console.error('Auth routes error:', err.message);
+}
 
-// 404 Handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found', path: req.path });
-});
+// Try loading lead routes
+try {
+  const leadRoutes = require('./routes/lead.routes');
+  app.use('/api/leads', leadRoutes);
+} catch (err) {
+  console.error('Lead routes error:', err.message);
+}
 
-// Error Handler
+// Try loading interaction routes
+try {
+  const interactionRoutes = require('./routes/interaction.routes');
+  app.use('/api/interactions', interactionRoutes);
+} catch (err) {
+  console.error('Interaction routes error:', err.message);
+}
+
+// Try loading scraper routes
+try {
+  const scraperRoutes = require('./routes/scraper.routes');
+  app.use('/api/scraper', scraperRoutes);
+} catch (err) {
+  console.error('Scraper routes error:', err.message);
+}
+
+// 404
+app.use((req, res) => res.status(404).json({ error: 'not found' }));
+
+// Error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err.message);
-  res.status(err.status || 500).json({ 
-    error: err.message || 'Internal server error',
-    status: err.status || 500
-  });
+  res.status(500).json({ error: err.message });
 });
 
-// Only start the HTTP server when this file is run directly (local dev).
-// On Vercel the module is imported by api/index.js and used as a handler.
 if (require.main === module) {
-  const PORT = process.env.PORT || 3001;
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
+  app.listen(process.env.PORT || 3001);
 }
 
 module.exports = app;
