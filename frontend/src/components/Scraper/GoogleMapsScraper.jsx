@@ -4,6 +4,8 @@ import api from '../../services/api';
 
 export default function GoogleMapsScraper({ onDataScraped, onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [mapsUrl, setMapsUrl] = useState('');
+  const [mode, setMode] = useState('search'); // 'search' atau 'url'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState([]);
@@ -44,7 +46,62 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
         }
       } catch (err) {
         console.error('Erro na busca:', err);
-        setError('Erro ao buscar: ' + (err.response?.data?.error || err.message || 'Tente novamente em alguns segundos'));
+        const errorData = err.response?.data;
+        
+        // Se for erro 503 (serviço temporariamente indisponível), mostrar alternativa
+        if (err.response?.status === 503) {
+          setError('BUSCA_INDISPONÍVEL');
+          setMode('url'); // Mudar para modo URL
+        } else {
+          setError('Erro ao buscar: ' + (errorData?.error || err.message || 'Tente novamente em alguns segundos'));
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }
+
+  function handleUrlSubmit(e) {
+    e.preventDefault();
+    
+    if (!mapsUrl.trim()) {
+      setError('Cole uma URL do Google Maps');
+      return;
+    }
+
+    // Validar se é URL do Google Maps
+    if (!mapsUrl.includes('maps.google.com') && !mapsUrl.includes('google.com/maps')) {
+      setError('URL inválida. Use uma URL do Google Maps');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setResults([]);
+    setSelectedResults(new Set());
+
+    (async () => {
+      try {
+        console.log('Enviando URL para:', mapsUrl);
+        const response = await api.post('/scraper/google-maps', { url: mapsUrl });
+        
+        console.log('Resposta:', response.data);
+
+        if (response.data.success) {
+          const data = response.data.data || [];
+          
+          if (data.length === 0) {
+            setError('Nenhum resultado encontrado nesta URL. Tente outra.');
+          } else {
+            setResults(data);
+            setSearchedTerm(mapsUrl);
+          }
+        } else {
+          setError(response.data.error || 'Erro ao processar URL');
+        }
+      } catch (err) {
+        console.error('Erro ao processar URL:', err);
+        setError('Erro ao processar URL: ' + (err.response?.data?.error || err.message || 'Tente novamente'));
       } finally {
         setLoading(false);
       }
@@ -236,68 +293,152 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
           </button>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-sm text-red-800">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
+        {error === 'BUSCA_INDISPONÍVEL' ? (
+          <>
+            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start gap-2 mb-3">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600" />
+                <div>
+                  <p className="font-semibold text-amber-900">Busca por termo indisponível</p>
+                  <p className="text-sm text-amber-800 mt-1">A busca automática está tendo limitações técnicas, mas você pode usar URLs do Google Maps!</p>
+                </div>
+              </div>
+            </div>
 
-        <form onSubmit={handleSearch} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              O que você procura?
-            </label>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setError('');
-              }}
-              placeholder="Ex: mecânicos em joinville"
-              disabled={loading}
-              autoFocus
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50"
-            />
-          </div>
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Como usar com URLs (funciona perfeitamente!):
+              </p>
+              <ol className="space-y-2 text-sm text-blue-800">
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-blue-200 text-blue-900 text-xs font-bold rounded-full">1</span>
+                  <span>Acesse <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">maps.google.com</a></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-blue-200 text-blue-900 text-xs font-bold rounded-full">2</span>
+                  <span>Faça uma busca (ex: "mecânicos em joinville")</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-blue-200 text-blue-900 text-xs font-bold rounded-full">3</span>
+                  <span>Copie a URL da barra de endereços</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-blue-200 text-blue-900 text-xs font-bold rounded-full">4</span>
+                  <span>Cole no campo abaixo</span>
+                </li>
+              </ol>
+            </div>
 
-          {/* Exemplos */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
-            <p className="font-semibold mb-2 flex items-center gap-1">
-              <Search className="w-4 h-4" />
-              Exemplos de busca:
+            {/* Campo para colar URL */}
+            <form onSubmit={handleUrlSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Cole a URL do Google Maps:
+                </label>
+                <input
+                  type="text"
+                  value={mapsUrl}
+                  onChange={(e) => {
+                    setMapsUrl(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="Ex: https://maps.google.com/?q=..."
+                  disabled={loading}
+                  autoFocus
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || !mapsUrl.trim()}
+                className="w-full px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    Processando URL...
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-4 h-4" />
+                    Extrair Dados
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="text-xs text-gray-500 text-center mt-4">
+              ou <button type="button" onClick={() => { setError(''); setMode('search'); }} className="text-indigo-600 hover:underline font-semibold">tente novamente por termo</button>
             </p>
-            <ul className="space-y-1 list-disc list-inside">
-              <li>Encanadores em São Paulo</li>
-              <li>Eletricistas em Curitiba</li>
-              <li>Pizzarias no Rio de Janeiro</li>
-              <li>Restaurantes em Belo Horizonte</li>
-            </ul>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || !searchTerm.trim()}
-            className="w-full px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader className="w-4 h-4 animate-spin" />
-                Buscando...
-              </>
-            ) : (
-              <>
-                <Search className="w-4 h-4" />
-                Buscar Negócios
-              </>
+          </>
+        ) : (
+          <>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-sm text-red-800">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
             )}
-          </button>
-        </form>
 
-        <p className="text-xs text-gray-500 text-center mt-4">
-          💡 Dica: Quanto mais específica a busca, melhores os resultados
-        </p>
+            <form onSubmit={handleSearch} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  O que você procura?
+                </label>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="Ex: mecânicos em joinville"
+                  disabled={loading}
+                  autoFocus
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50"
+                />
+              </div>
+
+              {/* Exemplos */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+                <p className="font-semibold mb-2 flex items-center gap-1">
+                  <Search className="w-4 h-4" />
+                  Exemplos de busca:
+                </p>
+                <ul className="space-y-1 list-disc list-inside">
+                  <li>Encanadores em São Paulo</li>
+                  <li>Eletricistas em Curitiba</li>
+                  <li>Pizzarias no Rio de Janeiro</li>
+                  <li>Restaurantes em Belo Horizonte</li>
+                </ul>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || !searchTerm.trim()}
+                className="w-full px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    Buscando...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    Buscar Negócios
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="text-xs text-gray-500 text-center mt-4">
+              💡 Dica: Quanto mais específica a busca, melhores os resultados
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
