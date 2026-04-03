@@ -9,6 +9,18 @@ const ScraperController = require('../controllers/scraper.controller');
 const authMiddleware = require('../middleware/auth.middleware');
 
 /**
+ * GET /scraper/health
+ * Teste se a rota de scraper está funcionando
+ */
+router.get('/health', (req, res) => {
+  return res.json({ 
+    ok: true, 
+    message: 'Scraper routes are loaded',
+    timestamp: new Date().toISOString()
+  });
+});
+
+/**
  * POST /scraper/validate-url
  * Apenas valida se é URL do Google Maps (sem auth)
  */
