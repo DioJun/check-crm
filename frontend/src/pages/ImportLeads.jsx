@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Upload, ArrowRight, Check, AlertCircle, MapPin } from 'lucide-react';
+import { Upload, ArrowRight, Check, AlertCircle, MapPin, Link2 } from 'lucide-react';
 import api from '../services/api';
+import GoogleMapsScraper from '../components/Scraper/GoogleMapsScraper';
 
 export default function ImportLeads() {
   const [step, setStep] = useState(1); // 1: upload, 2: mapping, 3: confirm, 4: success
@@ -8,6 +9,7 @@ export default function ImportLeads() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showScraper, setShowScraper] = useState(false);
 
   // Data from spreadsheet
   const [spreadsheetData, setSpreadsheetData] = useState(null);
@@ -200,6 +202,43 @@ export default function ImportLeads() {
     setSuccess('');
   }
 
+  async function handleScrapedData(scrapedData) {
+    // Converter dados do scraper para o formato de lead
+    setLoading(true);
+    try {
+      // Tentar salvar diretamente como um novo lead
+      const leadData = {
+        nome: scrapedData.nome,
+        telefone: scrapedData.telefone,
+        cidade: scrapedData.website ? new URL(scrapedData.website).hostname : '',
+        servico: '',
+        origem: 'Google Maps Scraper',
+        avaliacoes: scrapedData.avaliacoes,
+        temWhatsapp: !!scrapedData.telefone,
+        temSite: !!scrapedData.website,
+        site: scrapedData.website,
+      };
+
+      // Fazer POST direto para criar o lead
+      const res = await api.post('/leads', leadData);
+      
+      if (res.data) {
+        setSuccess(`✓ Lead "${scrapedData.nome}" importado com sucesso!`);
+        setShowScraper(false);
+        setError('');
+        
+        // Mostrar tela de sucesso por 3 segundos
+        setTimeout(() => {
+          setSuccess('');
+        }, 3000);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao salvar lead: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
@@ -245,44 +284,79 @@ export default function ImportLeads() {
 
       {/* Step 1: Upload */}
       {step === 1 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-8">
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Selecione seu arquivo
-            </h3>
-            <p className="text-gray-500 text-sm mb-6">
-              Suporta Excel (.xlsx, .xls), CSV ou Exportação do Google Maps
-            </p>
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleFileSelect}
-              className="hidden"
-              id="file-input"
-            />
-            <label
-              htmlFor="file-input"
-              className="inline-block px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg cursor-pointer transition-colors"
-            >
-              Escolher arquivo
-            </label>
-            {file && (
-              <p className="mt-4 text-sm text-green-600">
-                ✓ {file.name} selecionado
-              </p>
-            )}
+        <div className="space-y-6">
+          {/* Google Maps Scraper Card */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Google Maps Scraper
+                  </h3>
+                </div>
+                <p className="text-gray-600 text-sm mb-4">
+                  Não quer fazer upload? Cole a URL de um negócio no Google Maps e extraímos os dados automaticamente!
+                </p>
+                <button
+                  onClick={() => setShowScraper(true)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Link2 className="w-4 h-4" />
+                  Usar Scraper
+                </button>
+              </div>
+              <div className="text-4xl">📍</div>
+            </div>
           </div>
 
-          <div className="mt-8 flex justify-end">
-            <button
-              onClick={handleUpload}
-              disabled={!file || loading}
-              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors"
-            >
-              {loading ? 'Processando...' : 'Próximo'}
-              <ArrowRight className="w-4 h-4" />
-            </button>
+          {/* OR Divider */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1 border-t border-gray-300"></div>
+            <span className="text-gray-500 font-medium">OU</span>
+            <div className="flex-1 border-t border-gray-300"></div>
+          </div>
+
+          {/* Upload Card */}
+          <div className="bg-white rounded-lg border border-gray-200 p-8">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Selecione seu arquivo
+              </h3>
+              <p className="text-gray-500 text-sm mb-6">
+                Suporta Excel (.xlsx, .xls), CSV ou Exportação do Google Maps
+              </p>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="file-input"
+              />
+              <label
+                htmlFor="file-input"
+                className="inline-block px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg cursor-pointer transition-colors"
+              >
+                Escolher arquivo
+              </label>
+              {file && (
+                <p className="mt-4 text-sm text-green-600">
+                  ✓ {file.name} selecionado
+                </p>
+              )}
+            </div>
+
+            <div className="mt-8 flex justify-end">
+              <button
+                onClick={handleUpload}
+                disabled={!file || loading}
+                className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors"
+              >
+                {loading ? 'Processando...' : 'Próximo'}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -574,5 +648,13 @@ export default function ImportLeads() {
         </div>
       )}
     </div>
+
+    {/* Google Maps Scraper Modal */}
+    {showScraper && (
+      <GoogleMapsScraper
+        onDataScraped={handleScrapedData}
+        onClose={() => setShowScraper(false)}
+      />
+    )}
   );
 }
