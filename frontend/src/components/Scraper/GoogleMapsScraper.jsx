@@ -23,8 +23,7 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
     setResults([]);
     setSelectedResults(new Set());
 
-    // Simular busca (em desenvolvimento)
-    setTimeout(async () => {
+    (async () => {
       try {
         console.log('Enviando busca para:', searchTerm);
         const response = await api.post('/scraper/search', { searchTerm });
@@ -34,55 +33,22 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
         if (response.data.success) {
           const data = response.data.data || [];
           
-          // Se recebeu resultados, usar; senão usar resultados reais de teste
-          if (data.length > 0) {
+          if (data.length === 0) {
+            setError('Nenhum resultado encontrado. Tente outro termo.');
+          } else {
             setResults(data);
             setSearchedTerm(searchTerm);
-          } else {
-            setError('Nenhum resultado encontrado. Tente um termo diferente.');
           }
         } else {
           setError(response.data.error || 'Erro ao buscar');
         }
       } catch (err) {
         console.error('Erro na busca:', err);
-        
-        // Fallback: mostrar resultados simulados
-        console.warn('⚠️ Usando resultados de teste');
-        const mockResults = getMockResults(searchTerm);
-        setResults(mockResults);
-        setSearchedTerm(searchTerm);
-        setError(null);
+        setError('Erro ao buscar: ' + (err.response?.data?.error || err.message || 'Tente novamente em alguns segundos'));
       } finally {
         setLoading(false);
       }
-    }, 500); // Pequeno delay para simular processamento
-  }
-
-  function getMockResults(term) {
-    return [
-      { 
-        nome: 'Oficina ' + (term.includes('mecânicos') ? 'Mecanizada' : 'Centro'), 
-        endereco: 'Rua Principal, 123 - Joinville', 
-        avaliacoes: '4.5',
-        telefone: '+5547999226015',
-        website: 'https://exemplo.com'
-      },
-      { 
-        nome: 'Serviços Automotivos ' + (term.includes('mecânicos') ? 'Express' : 'Rápidos'), 
-        endereco: 'Avenida Brasil, 456 - Joinville', 
-        avaliacoes: '4.2',
-        telefone: null,
-        website: null
-      },
-      { 
-        nome: 'Manutenção ' + (term.includes('mecânicos') ? 'Especializada' : 'Geral'), 
-        endereco: 'Rua do Comércio, 789 - Joinville', 
-        avaliacoes: '4.8',
-        telefone: null,
-        website: null
-      }
-    ];
+    })();
   }
 
   function toggleResult(index) {

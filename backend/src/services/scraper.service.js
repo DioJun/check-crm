@@ -377,15 +377,16 @@ class ScraperService {
 
       await browser.close();
 
+      if (results.length === 0) {
+        throw new Error('Nenhum resultado encontrado com Puppeteer');
+      }
+
       console.log(`✅ ${results.length} resultados extraídos com Puppeteer`);
-      return results.length > 0 ? results : await this.searchWithHttpFetch(searchTerm);
+      return results;
 
     } catch (error) {
       console.error('❌ Erro em searchWithPuppeteer:', error.message);
-      
-      // Fallback para método HTTP
-      console.warn('⚠️ Tentando método alternativo com fetch...');
-      return await this.searchWithHttpFetch(searchTerm);
+      throw error;
     }
   }
 
@@ -410,87 +411,17 @@ class ScraperService {
       
       const html = await response.text();
       
-      // Tentar fazer parsing do HTML
-      // Nota: Google Maps usa muito JavaScript, então isso pode ter limitações
-      console.log('📄 HTML recebido:', html.length, 'bytes');
-      
-      // Se conseguir parsing, extrair dados; senão usar mock
-      return this.getMockSearchResults(searchTerm);
+      // Google Maps usa muito JavaScript, fetch puro não consegue renderizar
+      console.warn('⚠️ Fetch sem JavaScript não consegue extrair dados do Google Maps');
+      throw new Error('Método alternativo não disponível - Puppeteer não conseguiu executar');
       
     } catch (error) {
       console.error('❌ Erro em searchWithHttpFetch:', error.message);
-      return this.getMockSearchResults(searchTerm);
+      throw error;
     }
   }
 
-  /**
-   * Retorna resultados simulados quando Puppeteer não está disponível
-   * (Para testing/desenvolvimento)
-   */
-  static getMockSearchResults(searchTerm) {
-    console.warn('⚠️ Usando resultados de teste para: ' + searchTerm);
-    
-    // Gerar 5-8 resultados simulados realistas
-    const resultados = [
-      {
-        nome: 'Auto Mecânica ' + (searchTerm.includes('joinville') ? 'Joinville' : 'Centro'),
-        endereco: 'Rua 15 de Novembro, 1450 - Centro, Joinville - SC 89201-050',
-        avaliacoes: '4.6 (158 avaliações)',
-        telefone: '+5547991234567',
-        website: 'https://automecanica.com.br',
-        latitude: -26.2981,
-        longitude: -48.8425
-      },
-      {
-        nome: 'Oficina Do Mecânico',
-        endereco: 'Rua Princesa Isabel, 2300 - Atiradores, Joinville - SC 89203-500',
-        avaliacoes: '4.3 (89 avaliações)',
-        telefone: '+5547987654321',
-        website: null,
-        latitude: -26.3158,
-        longitude: -48.8652
-      },
-      {
-        nome: 'Expert Mecânica Automotiva',
-        endereco: 'Avenida Getúlio Vargas, 800 - Bucarein, Joinville - SC 89202-400',
-        avaliacoes: '4.8 (234 avaliações)',
-        telefone: '+5547998765432',
-        website: 'https://expertmecanica.com.br',
-        latitude: -26.3097,
-        longitude: -48.8356
-      },
-      {
-        nome: 'Mecânica Rápida Express',
-        endereco: 'Rua Visconde de Taunay, 567 - Costa e Silva, Joinville - SC 89220-000',
-        avaliacoes: '4.2 (67 avaliações)',
-        telefone: null,
-        website: null,
-        latitude: -26.3502,
-        longitude: -48.8989
-      },
-      {
-        nome: 'Car Center Mecânica',
-        endereco: 'Avenida Beira Rio, 2100 - Saguaçu, Joinville - SC 89221-400',
-        avaliacoes: '4.5 (145 avaliações)',
-        telefone: '+5547989123456',
-        website: null,
-        latitude: -26.3245,
-        longitude: -48.7892
-      },
-      {
-        nome: 'Mecânica do Tio João',
-        endereco: 'Rua Amazonas, 340 - América, Joinville - SC 89204-020',
-        avaliacoes: '4.4 (92 avaliações)',
-        telefone: '+5547991567890',
-        website: null,
-        latitude: -26.2756,
-        longitude: -48.8901
-      }
-    ];
 
-    // Embaralhar resultados
-    return resultados.sort(() => 0.5 - Math.random()).slice(0, 6);
-  }
 }
 
 module.exports = ScraperService;
