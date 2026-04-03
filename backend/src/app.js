@@ -45,8 +45,9 @@ try {
 try {
   const scraperRoutes = require('./routes/scraper.routes');
   app.use('/api/scraper', scraperRoutes);
+  console.log('✅ Scraper routes loaded at /api/scraper');
 } catch (err) {
-  console.error('Scraper routes error:', err.message);
+  console.error('❌ Scraper routes error:', err.message);
 }
 
 // 404
