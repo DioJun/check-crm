@@ -91,7 +91,7 @@ class ScraperService {
 
     try {
       // Extrair coordenadas: /@lat,lng,
-      const coordMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      const coordMatch = url.match(/@(-?[0-9.]+),(-?[0-9.]+)/);
       if (coordMatch) {
         data.latitude = parseFloat(coordMatch[1]);
         data.longitude = parseFloat(coordMatch[2]);
