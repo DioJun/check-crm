@@ -14,22 +14,34 @@ const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = process.env.CORS_ORIGIN
       ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
-      : ['http://localhost:5173', 'http://localhost:3000'];
+      : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'];
 
-    // Allow requests with no origin (like mobile apps or Vercel)
+    // Allow requests with no origin (like mobile apps or Vercel Functions)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.warn(`CORS blocked origin: ${origin}`);
-      callback(null, true); // Allow for now, strict in production
+      console.warn(`Allowed origins: ${allowedOrigins.join(', ')}`);
+      // Em prod, descomentar: callback(new Error('Not allowed by CORS'));
+      callback(null, true); // Permitir por enquanto para debug
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400,
 };
 
 app.use(cors(corsOptions));
+
+// Log CORS info on startup
+console.log('🔐 CORS Configurado para origins:');
+if (process.env.CORS_ORIGIN) {
+  process.env.CORS_ORIGIN.split(',').forEach(o => console.log(`  ✓ ${o.trim()}`));
+} else {
+  console.log('  ! Nenhum origin específico. Usando localhost.');
+}
+
 app.use(express.json());
 
 app.get('/health', (req, res) => {
