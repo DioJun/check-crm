@@ -77,31 +77,50 @@ class ScraperService {
       console.log('🔗 URL reconstruída:', fullUrl);
     }
 
-    // Estratégia 1: Tentar extrair dados da URL encoded
-    const dataFromUrl = this.parseGoogleMapsUrl(fullUrl);
-    
-    // Estratégia 2: Se temos coordenadas, tentar usar
-    if (dataFromUrl.latitude && dataFromUrl.longitude) {
-      const result = await this.getBusinessDataByCoordinates(dataFromUrl);
-      if (result && result.nome) {
-        return [result];
-      }
+    // Verificar se é URL de BUSCA (dinâmica) ou LUGAR (estático)
+    const isSearchUrl = fullUrl.includes('/search/') || fullUrl.includes('?q=');
+    const isPlaceUrl = fullUrl.includes('/place/');
+
+    if (isSearchUrl) {
+      console.log('🔍 Detectado: URL de BUSCA (dinâmica)');
+      throw new Error(
+        'URLs de busca requerem a busca por termo. ' +
+        'Use o campo de busca e digite o termo (ex: "Eletricistas em Curitiba") para obter múltiplos resultados.'
+      );
     }
 
-    // Estratégia 3: Tentar com Puppeteer se for URL válida
-    if (fullUrl.includes('google') && fullUrl.includes('maps')) {
+    if (isPlaceUrl) {
+      console.log('📍 Detectado: URL de LUGAR (estático)');
+      // Estratégia 1: Tentar extrair dados diretos da URL
+      const dataFromUrl = this.parseGoogleMapsUrl(fullUrl);
+      
+      if (dataFromUrl.nome || (dataFromUrl.latitude && dataFromUrl.longitude)) {
+        try {
+          const result = await this.getBusinessDataByCoordinates(dataFromUrl);
+          if (result) {
+            return [result];
+          }
+        } catch (err) {
+          console.error('Erro ao extrair dados do lugar:', err.message);
+        }
+      }
+
+      // Tentar com Puppeteer
       try {
         const results = await this.scrapeWithHeadlessBrowser(fullUrl);
         if (results && results.length > 0) {
           return results;
         }
       } catch (puppeteerError) {
-        console.error('⚠️ Puppeteer falhou:', puppeteerError.message);
+        console.error('⚠️ Puppeteer falhou para lugar:', puppeteerError.message);
       }
     }
 
-    // Se chegou aqui, nenhuma estratégia funcionou
-    throw new Error('Não foi possível extrair dados desta URL. Tente uma URL completa do Google Maps.');
+    // Se chegou aqui, não conseguiu processar
+    throw new Error(
+      'Tipo de URL não suportado. ' +
+      'Use: (1) Busca por termo no CRM, ou (2) URL de um lugar específico do Google Maps (com /place/ na URL).'
+    );
   }
 
   /**
@@ -154,13 +173,24 @@ class ScraperService {
   static async getBusinessDataByCoordinates(data) {
     console.log('📍 Buscando dados por coordenadas...');
     
+    // Se não tem nome mas tem coordenadas, tentar fazer busca reversa
+    if (!data.nome && data.latitude && data.longitude) {
+      console.log(`Coordenadas: ${data.latitude}, ${data.longitude}`);
+      // Em produção, aqui entraria Geocoding reverso
+      return null;
+    }
+    
     // Aqui entraria integração com Google Maps API
     // Por enquanto, retornamos os dados parseados como base
-    return {
-      ...data,
-      fonte: 'coordinate_parse',
-      confianca: 'media'
-    };
+    if (data.nome || data.endereco) {
+      return {
+        ...data,
+        fonte: 'url_parse',
+        confianca: 'media'
+      };
+    }
+    
+    return null;
   }
 
   /**
