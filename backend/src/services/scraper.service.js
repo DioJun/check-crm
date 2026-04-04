@@ -335,48 +335,99 @@ class ScraperService {
         console.log('⚠️ Seletor [role="option"] não disponível');
       }
 
-      // Extrair resultados
+      // Extrair resultados com estratégia específica para Google Maps
       const results = await page.evaluate(() => {
         const items = [];
         
-        // Estratégia 1: Procurar por [role="option"]
-        let searchResults = document.querySelectorAll('[role="option"]');
-        console.log(`[page] Encontrados ${searchResults.length} com [role="option"]`);
+        // Estratégia otimizada para Google Maps
+        // Os resultados estão organizados em divs com classe/atributos específicos
         
-        // Estratégia 2: Se não encontrou, procurar por outros seletores
-        if (searchResults.length === 0) {
-          searchResults = document.querySelectorAll('div[data-item-id]');
-          console.log(`[page] Tentativa 2 (data-item-id): ${searchResults.length}`);
+        // Procurar pela lista de resultados (normalmente em [role="listbox"] ou similar)
+        const listbox = document.querySelector('[role="listbox"]');
+        let searchResults = [];
+        
+        if (listbox) {
+          // Pegar todos os divs que são diretos filhos e parecem ser items
+          searchResults = Array.from(listbox.querySelectorAll('div > div'))
+            .filter((div, idx) => idx > 0 && idx < 25); // Pular primeiro (é container)
         }
         
-        // Estratégia 3: Procurar por divs com texto relevante
+        // Se listbox não funcionar, tentar seletores alternativos
         if (searchResults.length === 0) {
-          const allDivs = document.querySelectorAll('div');
-          searchResults = Array.from(allDivs).filter(div => {
-            const text = div.innerText || '';
-            return text.length > 20 && text.includes('\n');
-          }).slice(0, 30);
-          console.log(`[page] Tentativa 3 (divs com texto): ${searchResults.length}`);
+          searchResults = Array.from(document.querySelectorAll('div'))
+            .filter(div => {
+              const text = div.textContent || '';
+              const childCount = div.children.length;
+              // Resultados normalmente têm 2-3 children (ícone, nome, info)
+              return childCount >= 1 && text.length > 5 && text.length < 500 &&
+                     !text.includes('Classificação') &&
+                     !text.includes('Filtros') &&
+                     !text.includes('©') &&
+                     !text.includes('Mapa');
+            })
+            .slice(0, 30);
         }
         
-        searchResults.forEach((result, index) => {
-          if (index < 20) {
-            const text = result.innerText || result.textContent;
-            if (text && text.length > 5) {
-              const lines = text.split('\n').filter(l => l.trim());
-              
-              if (lines.length > 0) {
-                items.push({
-                  nome: lines[0] || 'Sem nome',
-                  endereco: lines[1] || lines[2] || 'Endereço não disponível',
-                  avaliacoes: lines.find(l => l.includes('⭐') || l.includes('★') || l.includes('(')) || '',
-                  fonte: 'google_maps_search'
-                });
-              }
-            }
+        console.log(`[page] Procurando em ${searchResults.length} elementos`);
+        
+        // Processar cada resultado
+        searchResults.forEach((result, idx) => {
+          if (items.length >= 20) return;
+          
+          const fullText = (result.innerText || result.textContent || '').trim();
+          
+          // Pular se for texto muito curto ou vazio
+          if (fullText.length < 3) return;
+          
+          // Limpar linhas
+          const lines = fullText
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => 
+              l && 
+              l.length > 1 && 
+              !l.includes('Classificação') &&
+              !l.includes('filtros') &&
+              !l.includes('Resultados') &&
+              !l.includes('compartilhar') &&
+              !l.includes('Horas') &&
+              !l.includes('Arraste')
+            );
+          
+          if (lines.length === 0) return;
+          
+          // Primeiro elemento é geralmente o nome
+          const nome = lines[0];
+          
+          // Pular se parecer um filtro/label
+          if (nome.toLowerCase().includes('filtro') || 
+              nome.toLowerCase().includes('resultado') ||
+              nome.toLowerCase().includes('classificação')) {
+            return;
+          }
+          
+          // Endereço é normalmente a segunda linha
+          const endereco = lines.length > 1 ? lines[1] : '';
+          
+          // Avaliação pode estar em várias linhas
+          const avaliacoes = lines.find(l => 
+            l.includes('⭐') || 
+            l.includes('★') || 
+            /\d+,?\d*\s*\(\d+\)/.test(l)
+          ) || '';
+          
+          // Validar que temos um nome válido
+          if (nome && nome.length > 2 && !nome.includes('Abrir') && !nome.includes('Fechar')) {
+            items.push({
+              nome: nome.substring(0, 100),
+              endereco: endereco.substring(0, 200) || 'Endereço não informado',
+              avaliacoes: avaliacoes.substring(0, 100),
+              fonte: 'google_maps_search'
+            });
           }
         });
-
+        
+        console.log(`[page] Extraídos ${items.length} itens válidos de ${searchResults.length} elementos`);
         return items;
       });
 
