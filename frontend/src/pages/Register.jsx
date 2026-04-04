@@ -36,7 +36,8 @@ export default function Register() {
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-indigo-800 to-indigo-700 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white">TemplatesHub CRM</h1>
+          <div className="flex justify-center mb-3"><img src="/favicon.svg" alt="Checkmate" className="w-16 h-16" /></div>
+          <h1 className="text-3xl font-bold text-white">Checkmate <span className="text-indigo-300 font-normal text-xl">CRM</span></h1>
           <p className="text-indigo-300 mt-2">Crie sua conta</p>
         </div>
 

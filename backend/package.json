@@ -1,7 +1,7 @@
 {
-  "name": "templateshub-crm-backend",
+  "name": "checkmate-crm-backend",
   "version": "1.0.0",
-  "description": "TemplatesHub CRM Backend",
+  "description": "Checkmate CRM Backend",
   "main": "src/app.js",
   "scripts": {
     "dev": "nodemon src/app.js",

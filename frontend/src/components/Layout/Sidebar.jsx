@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Users, Kanban, LogOut, X, Menu, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import KnightIcon from '../ui/KnightIcon';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -29,9 +30,12 @@ export default function Sidebar() {
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-5 border-b border-indigo-700">
-        <h1 className="text-white font-bold text-lg leading-tight">TemplatesHub CRM</h1>
-        <p className="text-indigo-300 text-xs mt-0.5">Gestão de Leads</p>
+      <div className="px-4 py-5 border-b border-indigo-700 flex items-center gap-3">
+        <KnightIcon className="w-9 h-9 flex-shrink-0" />
+        <div>
+          <h1 className="text-white font-bold text-lg leading-tight">Checkmate</h1>
+          <p className="text-indigo-300 text-xs mt-0.5">CRM · Gestão de Leads</p>
+        </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map(({ to, label, icon: Icon }) => (
@@ -63,8 +67,9 @@ export default function Sidebar() {
         >
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
-        <div className="ml-4">
-          <h1 className="text-white font-bold text-lg leading-tight">TemplatesHub CRM</h1>
+        <div className="ml-3 flex items-center gap-2">
+          <KnightIcon className="w-7 h-7" />
+          <h1 className="text-white font-bold text-lg leading-tight">Checkmate</h1>
         </div>
       </header>
 

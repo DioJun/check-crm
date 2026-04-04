@@ -1,7 +1,7 @@
 {
   "name": "check-crm",
   "version": "2.0.0",
-  "description": "CRM Desktop - Google Maps Scraper",
+  "description": "Checkmate CRM - Gestão de Leads com Google Maps Scraper",
   "main": "electron/main.js",
   "homepage": "./",
   "scripts": {
@@ -28,7 +28,7 @@
   },
   "build": {
     "appId": "com.checkcrm.app",
-    "productName": "CheckCRM",
+    "productName": "Checkmate CRM",
     "files": [
       "electron/**/*",
       "backend/src/**/*",
