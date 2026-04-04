@@ -246,6 +246,144 @@ class ScraperService {
   }
 
   /**
+   * Qualificar e normalizar dados extraídos
+   * Retorna score de qualidade (0-100) e dados normalizados
+   */
+  static qualifyLead(lead) {
+    let score = 0;
+    const issues = [];
+
+    // ✓ Nome válido (max 15 pontos)
+    if (lead.nome && lead.nome.length > 5) {
+      score += 15;
+    } else {
+      issues.push('Nome muito curto ou vazio');
+    }
+
+    // ✓ Endereço válido (max 25 pontos)
+    if (lead.endereco && lead.endereco.length > 10 && /\d+/.test(lead.endereco)) {
+      score += 25;
+    } else if (lead.endereco && lead.endereco.length > 5) {
+      score += 10;
+      issues.push('Endereço incompleto');
+    } else {
+      issues.push('Endereço ausente');
+    }
+
+    // ✓ Telefone válido (max 30 pontos)
+    if (lead.telefone && /\(\d{2,3}\)\s*\d{4,5}-\d{3,4}/.test(lead.telefone)) {
+      score += 30;
+    } else if (lead.telefone) {
+      score += 10;
+      issues.push('Telefone inválido ou incompleto');
+    } else {
+      issues.push('Telefone ausente');
+    }
+
+    // ✓ Avaliação/Status (max 15 pontos)
+    if (lead.avaliacoes && lead.avaliacoes.length > 3) {
+      score += 15;
+    }
+
+    // ✓ Dados adicionais (max 15 pontos)
+    if (lead.website || lead.horario) {
+      score += 5;
+    }
+
+    return {
+      ...lead,
+      quality_score: Math.min(score, 100),
+      quality_level: score >= 80 ? 'ALTA' : score >= 50 ? 'MÉDIA' : 'BAIXA',
+      issues: issues
+    };
+  }
+
+  /**
+   * Extrair telefone de forma normalizada
+   */
+  static extractPhone(text) {
+    if (!text) return null;
+    // Padrão: (XX) XXXXX-XXXX ou variações
+    const match = text.match(/\(\d{2,3}\)\s*\d{4,5}-\d{3,4}/);
+    return match ? match[0] : null;
+  }
+
+  /**
+   * Normalizar endereço (remover excesso de espaços, limpeza)
+   */
+  static normalizeAddress(text) {
+    if (!text) return '';
+    return text
+      .trim()
+      .replace(/\s+/g, ' ')
+      .substring(0, 150);
+  }
+
+  /**
+   * Deduplicar leads por múltiplos critérios
+   * Telefone é a chave primária de deduplicação
+   * Se telefone for igual, mescla os dados
+   */
+  static deduplicateLeads(leads) {
+    console.log(`📊 Deduplicando ${leads.length} leads...`);
+    
+    const byPhone = new Map(); // Chave primária: telefone
+    const byAddress = new Map(); // Índice secundário: endereço
+
+    leads.forEach(lead => {
+      const phone = this.extractPhone(lead.telefone);
+      const addr = this.normalizeAddress(lead.endereco);
+
+      // Se tem telefone, usar como chave primária
+      if (phone) {
+        if (byPhone.has(phone)) {
+          // MESCLAR: Combinar dados do lead existente com novo
+          const existing = byPhone.get(phone);
+          console.log(`🔗 Mesclando leads com telefone ${phone}`);
+
+          // Manter nome mais completo
+          if (lead.nome.length > existing.nome.length) {
+            existing.nome = lead.nome;
+          }
+
+          // Manter endereço mais completo
+          if (lead.endereco && lead.endereco.length > existing.endereco.length) {
+            existing.endereco = lead.endereco;
+          }
+
+          // Adicionar campo indicando merge
+          if (!existing.merged_from) {
+            existing.merged_from = [];
+          }
+          existing.merged_from.push(lead.nome);
+        } else {
+          // Novo lead
+          byPhone.set(phone, { ...lead, merged_from: [] });
+        }
+      } else if (addr && addr.length > 10) {
+        // Se não tem telefone, tentar agrupar por endereço
+        if (!byAddress.has(addr)) {
+          byAddress.set(addr, lead);
+        }
+      }
+    });
+
+    // Combinar leads por telefone com os por endereço
+    const deduplicated = Array.from(byPhone.values());
+    
+    // Adicionar leads que só têm endereço (sem duplicatas)
+    byAddress.forEach((lead, addr) => {
+      const phone = this.extractPhone(lead.telefone);
+      if (!phone) {
+        deduplicated.push(lead);
+      }
+    });
+
+    console.log(`✅ Reduzidos para ${deduplicated.length} leads únicos`);
+    return deduplicated;
+  }
+
+  /**
    * BUSCA POR TERMO - Funciona APENAS LOCALMENTE com Puppeteer
    * 
    * Em Vercel/cloud: Retorna erro claro
@@ -267,11 +405,20 @@ class ScraperService {
 
     try {
       console.log('🚀 Usando Puppeteer para buscar...');
-      const results = await this.searchWithPuppeteer(searchTerm);
+      let results = await this.searchWithPuppeteer(searchTerm);
 
       if (!results || results.length === 0) {
         throw new Error('Nenhum resultado encontrado');
       }
+
+      // PROCESSAR: Deduplicar leads duplicados
+      results = this.deduplicateLeads(results);
+      
+      // PROCESSAR: Qualificar cada lead
+      results = results.map(lead => this.qualifyLead(lead));
+      
+      // ORDENAR: Leads de melhor qualidade primeiro
+      results = results.sort((a, b) => b.quality_score - a.quality_score);
 
       // Cachear por 24 horas
       scrapCache.set(cacheKey, results);
@@ -335,103 +482,100 @@ class ScraperService {
         console.log('⚠️ Seletor [role="option"] não disponível');
       }
 
-      // Extrair resultados com estratégia específica para Google Maps
+      // Extrair resultados - ESTRATÉGIA ROBUSTA
       const results = await page.evaluate(() => {
         const items = [];
+        const seenNames = new Set();
         
-        // Google Maps coloca os nomes dos negócios em estrutura específica
-        // Normalmente temos: ícone + nome + endereço + avaliação em um container
-        
-        // Procurar por divs que têm a estrutura típica de um resultado:
-        // - Contêm texto com endereço (rua, número, bairro)
-        // - Podem ter avaliação com ⭐
-        // - Têm múltiplas linhas de texto
-        
+        // Buscar TODOS os divs e analisá-los
         const allDivs = Array.from(document.querySelectorAll('div'));
+        
+        console.log(`[page] Analisando ${allDivs.length} divs...`);
         
         allDivs.forEach(div => {
           if (items.length >= 20) return;
           
+          // Obter texto do div e seus filhos
           const text = (div.innerText || div.textContent || '').trim();
           
-          // Critérios para identificar um resultado válido
-          const hasGoogleMapsStructure = 
-            // Tem pelo menos 2 linhas (nome e endereço)
-            text.split('\n').length >= 2 &&
-            // Tem um comprimento razoável
-            text.length > 10 && text.length < 1000 &&
-            // NÃO é elemento de Menu/UI
-            !text.includes('Recolher') &&
-            !text.includes('Abrir à') &&
-            !text.includes('Classificação') &&
-            !text.includes('Filtro') &&
-            !text.includes('Resultado') &&
-            !text.includes('© Google') &&
-            !text.includes('Mapa') &&
-            !text.includes('Compartilhar') &&
-            !text.includes('Menu') &&
-            !text.includes('Central de ajuda') &&
-            !text.includes('Configurações');
+          // Pular divs vazios ou muito pequenos
+          if (text.length < 10 || text.length > 500) return;
           
-          if (!hasGoogleMapsStructure) return;
-          
-          // Dividir em linhas e limpar
+          // Dividir em linhas
           let lines = text.split('\n')
             .map(l => l.trim())
-            .filter(l => l && l.length > 1);
+            .filter(l => l && l.length > 0 && l.length < 200);
           
-          // Remover linhas de ícones e símbolos
-          lines = lines.filter(l => 
-            !l.match(/^[⭐★🗺️📍🔍✉️📞🌐]+$/) &&
-            !l.includes('hr') &&
-            !l.match(/^\d+$/)
-          );
+          if (lines.length < 1) return;
           
-          if (lines.length < 2) return;
+          // Primeira linha é potencialmente o NOME
+          const potentialName = lines[0];
           
-          // Primeira linha é geralmente o nome
-          const nome = lines[0];
+          // FILTRAR UI ELEMENTS
+          const uiKeywords = [
+            'Recolher', 'Abrir', 'Compartilhar', 'Classificação', 
+            'Filtro', 'Menu', 'Ajuda', 'Configurações', 'Resultado',
+            '© Google', 'Mapa', 'Termos', 'Privacidade', 'Contribua'
+          ];
           
-          // Descartar se for tão curto que provavelmente é ícone ou label
-          if (nome.length < 3) return;
+          // Pular se tiver palavras-chave de UI
+          if (uiKeywords.some(kw => potentialName.includes(kw))) return;
           
-          // Buscar por linha que parece ser endereço
-          // Endereços geralmente tem rua + número ou número + bairro
+          // Nome deve ter tamanho razoável (3-80 chars)
+          if (potentialName.length < 3 || potentialName.length > 80) return;
+          
+          // Pular se já adicionado
+          if (seenNames.has(potentialName)) return;
+          
+          // Procurar por padrões de negócio (endereço, telefone, rating)
+          let hasBusinessPattern = false;
           let endereco = '';
+          let telefone = '';
           let avaliacoes = '';
           
-          for (let i = 1; i < lines.length; i++) {
+          for (let i = 1; i < lines.length && i < 5; i++) {
             const line = lines[i];
-            // Se tem números e texto, é provavelmente endereço
-            if (/\d/.test(line) && line.length > 5) {
+            
+            // Padrão de endereço: tem números (street number)
+            if (/\d+/.test(line) && line.length > 5) {
               endereco = line;
-              break;
+              hasBusinessPattern = true;
+            }
+            
+            // Padrão de telefone: (XX) XXXXX-XXXX
+            if (/\(\d{2,3}\)\s*\d{4,5}-\d{3,4}/.test(line)) {
+              telefone = line;
+              hasBusinessPattern = true;
+            }
+            
+            // Padrão de rating: ⭐4,5 (100) ou similar
+            if (/⭐|★|\d+,\d+\s*\(/.test(line)) {
+              avaliacoes = line;
+              hasBusinessPattern = true;
+            }
+            
+            // Padrão de horário: "Aberto" ou "Fechado"
+            if (/Aberto|Fechado|Horário/.test(line)) {
+              hasBusinessPattern = true;
             }
           }
           
-          // Procurar por avaliação
-          avaliacoes = lines.find(l => 
-            l.includes('⭐') || 
-            l.includes('★') ||
-            /\d+,\d+\s*\(\d+\)/.test(l)
-          ) || '';
-          
-          // Validação final: tem nome? Parece um negócio real?
-          if (nome && nome.length > 3 && 
-              !nome.includes('Abrir') && 
-              !nome.includes('Fechar') &&
-              !nome.toLowerCase().includes('menu')) {
-            
+          // Só adicionar se parecer um negócio real
+          if (hasBusinessPattern && potentialName.length > 3) {
+            seenNames.add(potentialName);
             items.push({
-              nome: nome.substring(0, 100),
-              endereco: endereco || 'Endereço não informado',
+              nome: potentialName.substring(0, 100),
+              endereco: endereco.substring(0, 100),
+              telefone: telefone.substring(0, 50),
               avaliacoes: avaliacoes.substring(0, 100),
               fonte: 'google_maps_search'
             });
+            
+            console.log(`[page] ✓ Encontrado: ${potentialName}`);
           }
         });
         
-        console.log(`[page] Extraídos ${items.length} resultados válidos`);
+        console.log(`[page] Extraídos ${items.length} resultados`);
         return items;
       });
 

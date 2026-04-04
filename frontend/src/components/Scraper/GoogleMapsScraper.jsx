@@ -151,7 +151,16 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-lg font-bold text-gray-900">Resultados da Busca</h2>
-              <p className="text-sm text-gray-600 mt-1">"{searchedTerm}" - {results.length} resultados encontrados</p>
+              <p className="text-sm text-gray-600 mt-1">
+                "{searchedTerm}" - {results.length} resultados 
+                {results.length > 0 && (
+                  <>
+                    ({results.filter(r => r.quality_level === 'ALTA').length}⭐ ALTA, 
+                    {results.filter(r => r.quality_level === 'MÉDIA').length} MÉDIA, 
+                    {results.filter(r => r.quality_level === 'BAIXA').length} BAIXA)
+                  </>
+                )}
+              </p>
             </div>
             <button
               onClick={onClose}
@@ -209,12 +218,32 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
                   />
                   
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 line-clamp-1">
-                      {result.nome || 'Sem nome'}
-                    </h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-gray-900 line-clamp-1">
+                        {result.nome || 'Sem nome'}
+                      </h3>
+                      
+                      {/* Badge de Qualidade */}
+                      {result.quality_score !== undefined && (
+                        <div className={`flex-shrink-0 px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                          result.quality_level === 'ALTA' ? 'bg-green-100 text-green-800' :
+                          result.quality_level === 'MÉDIA' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {result.quality_level} ({result.quality_score}%)
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Problemas de dados, se houver */}
+                    {result.issues && result.issues.length > 0 && (
+                      <div className="mt-1 text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded">
+                        ⚠️ {result.issues.join(', ')}
+                      </div>
+                    )}
                     
                     {result.endereco && (
-                      <div className="flex items-start gap-2 mt-1 text-sm text-gray-600">
+                      <div className="flex items-start gap-2 mt-2 text-sm text-gray-600">
                         <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
                         <span className="line-clamp-2">{result.endereco}</span>
                       </div>
@@ -230,13 +259,19 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
                       
                       {result.telefone && (
                         <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                          ✓ WhatsApp
+                          ✓ {result.telefone}
                         </span>
                       )}
                       
                       {result.website && (
                         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                           ✓ Site
+                        </span>
+                      )}
+                      
+                      {result.merged_from && result.merged_from.length > 0 && (
+                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                          🔗 {result.merged_from.length} mesclado(s)
                         </span>
                       )}
                     </div>
