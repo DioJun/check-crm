@@ -52,21 +52,45 @@ function normalizeTelefone(telefone) {
 async function importLeads(leads) {
   const now = new Date();
 
-  // Normalize and deduplicate within the batch
+  // Normalize and map fields from scraper to database schema
   const seen = new Set();
   const normalized = [];
+  
   for (const lead of leads) {
+    // Mapear campos do scraper para o schema do Prisma
     const tel = (lead.telefone && lead.telefone.trim()) ? normalizeTelefone(lead.telefone) : '';
-    const key = tel || lead.nome; // Use nome como chave se não tiver telefone
+    const key = tel || lead.nome;
     
     if (!seen.has(key)) {
       seen.add(key);
-      normalized.push({ 
-        ...lead, 
-        telefone: tel,
-        status: 'novo', 
-        dataEntrada: now 
-      });
+      
+      // Extrair apenas campos válidos do schema Lead
+      const mappedLead = {
+        nome: lead.nome?.trim() || 'Sem nome',
+        telefone: tel || null,
+        cidade: lead.cidade?.trim() || null,
+        servico: lead.servico?.trim() || null,
+        origem: lead.origem || 'Google Maps Scraper',
+        status: 'novo',
+        dataEntrada: now,
+        // IMPORTANTE: Mapear 'avaliacoes' → 'avaliacao' (singular)
+        avaliacao: lead.avaliacoes?.trim() || lead.avaliacao?.trim() || null,
+        temWhatsapp: lead.temWhatsapp || false,
+        temSite: lead.temSite || false,
+        site: lead.site?.trim() || null,
+        // Remover campos que não existem no schema:
+        // - address_validation_score
+        // - data_enriched
+        // - source_nominatim
+        // - latitude/longitude (não têm no schema, podem ir em reviews depois)
+      };
+      
+      // Se tem endereço enriquecido, guardar em reviews
+      if (lead.endereco) {
+        mappedLead.reviews = lead.endereco;
+      }
+      
+      normalized.push(mappedLead);
     }
   }
 
