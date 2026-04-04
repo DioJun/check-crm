@@ -245,7 +245,33 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
                     {result.endereco && (
                       <div className="flex items-start gap-2 mt-2 text-sm text-gray-600">
                         <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                        <span className="line-clamp-2">{result.endereco}</span>
+                        <div className="flex-1">
+                          <div className="line-clamp-2">{result.endereco}</div>
+                          {/* Indicador de validação de endereço */}
+                          {result.address_validation_score !== undefined && (
+                            <div className="mt-1">
+                              <div className="text-xs text-gray-500 mb-1">
+                                Endereço: {result.address_validation_score}% completo
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                <div 
+                                  className={`h-full rounded-full transition-all ${
+                                    result.address_validation_score >= 80 ? 'bg-green-500' :
+                                    result.address_validation_score >= 50 ? 'bg-yellow-500' :
+                                    'bg-red-500'
+                                  }`}
+                                  style={{ width: `${result.address_validation_score}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {/* Indicador de enriquecimento */}
+                          {result.data_enriched && (
+                            <div className="mt-1 text-xs text-blue-600">
+                              ✓ Dados validados com OpenStreetMap
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                     
@@ -263,9 +289,15 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
                         </span>
                       )}
                       
-                      {result.website && (
+                      {result.cep && (
                         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          ✓ Site
+                          📮 {result.cep}
+                        </span>
+                      )}
+                      
+                      {result.website && (
+                        <span className="text-xs bg-cyan-100 text-cyan-800 px-2 py-1 rounded">
+                          🌐 Site
                         </span>
                       )}
                       

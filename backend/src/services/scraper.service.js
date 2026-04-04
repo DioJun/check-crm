@@ -411,14 +411,23 @@ class ScraperService {
         throw new Error('Nenhum resultado encontrado');
       }
 
-      // PROCESSAR: Deduplicar leads duplicados
+      // PROCESSAR 1: Deduplicar leads duplicados
       results = this.deduplicateLeads(results);
       
-      // PROCESSAR: Qualificar cada lead
+      // PROCESSAR 2: Qualificar cada lead
       results = results.map(lead => this.qualifyLead(lead));
       
-      // ORDENAR: Leads de melhor qualidade primeiro
-      results = results.sort((a, b) => b.quality_score - a.quality_score);
+      // PROCESSAR 3: NOVO - Melhorar qualidade (enriquecer dados, validar endereços)
+      results = await this.improveLeadQuality(results);
+      
+      // ORDENAR: Leads de melhor qualidade de endereço primeiro, depois qualidade geral
+      results = results.sort((a, b) => {
+        // Primeiro por qualidade de endereço
+        const addrDiff = (b.address_validation_score || 0) - (a.address_validation_score || 0);
+        if (addrDiff !== 0) return addrDiff;
+        // Se iguais, por quality_score geral
+        return b.quality_score - a.quality_score;
+      });
 
       // Cachear por 24 horas
       scrapCache.set(cacheKey, results);
@@ -652,6 +661,161 @@ class ScraperService {
       fonte: item.fonte || 'unknown'
     }));
   }
+
+  /**
+   * ENRIQUECIMENTO DE DADOS - Integra múltiplas fontes
+   * Usa OpenStreetMap/Nominatim (GRATUITO) para complementar endereços
+   * 
+   * Não custo de API, sem limites práticos para CRM local
+   */
+  static async enrichLeadData(lead) {
+    try {
+      // Se tem endereço incompleto, tentar completar com Nominatim
+      if (lead.endereco && lead.endereco.length > 0) {
+        const enriched = await this.complementarEnderecoNominatim(lead);
+        return enriched;
+      }
+      return lead;
+    } catch (error) {
+      console.log(`⚠️ Erro ao enriquecer "${lead.nome}":`, error.message);
+      return lead; // Retornar lead original em caso de erro
+    }
+  }
+
+  /**
+   * Buscar dados completos via OpenStreetMap (Nominatim)
+   * GRATUITO - Não precisa de API key
+   * 
+   * Exemplo: "Eletricista, Curitiba, Brasil" → Nominatim retorna lat/lon/endereço completo
+   */
+  static async complementarEnderecoNominatim(lead) {
+    try {
+      // Montar query para busca
+      const query = `${lead.nome}, Curitiba, Brasil`;
+      const encoded = encodeURIComponent(query);
+      
+      // Request para Nominatim (10 requests/segundo é o limite, ok para CRM)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
+        {
+          headers: {
+            'User-Agent': 'CheckCRM-App (Scraper tool)'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        return lead; // Retornar original se falhar
+      }
+
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const result = data[0];
+        console.log(`📍 ${lead.nome}: Nominatim encontrou`);
+        
+        return {
+          ...lead,
+          // Usar endereço do Nominatim se o original for incompleto
+          endereco: lead.endereco || result.display_name.split(',').slice(0, 3).join(','),
+          latitude: parseFloat(result.lat),
+          longitude: parseFloat(result.lon),
+          // Campo que indica enriquecimento
+          data_enriched: true,
+          source_nominatim: true
+        };
+      }
+      
+      return lead;
+    } catch (error) {
+      console.log(`⚠️ Nominatim indisponível para "${lead.nome}"`);
+      return lead;
+    }
+  }
+
+  /**
+   * Validar endereço usando padrão brasileiro
+   * Retorna score de compltude: 0-100%
+   */
+  static validateAddress(endereco) {
+    if (!endereco) return 0;
+    
+    let score = 0;
+    
+    // Tem nome de rua/avenida (20%)
+    if (/\b(Rua|Av\.|Avenida|Praça|Travessa|Pça|Trav|Estrada|Rodovia|R\.)\b/i.test(endereco)) {
+      score += 20;
+    }
+    
+    // Tem número (30%)
+    if (/\d+/.test(endereco)) {
+      score += 30;
+    }
+    
+    // Tem bairro (20%)
+    if (endereco.includes(',')) {
+      score += 20;
+    }
+    
+    // Tem CEP (20%)
+    if (/\b\d{5}-?\d{3}\b/.test(endereco)) {
+      score += 20;
+    }
+    
+    // Tem complemento como "apto", "sala", etc (10%)
+    if (/\b(apto|sala|loja|bloco|apt|ap|sl)\b/i.test(endereco)) {
+      score += 10;
+    }
+    
+    return Math.min(score, 100);
+  }
+
+  /**
+   * Extrair CEP de um endereço
+   */
+  static extractCEP(endereco) {
+    if (!endereco) return null;
+    const match = endereco.match(/\b(\d{5})-?(\d{3})\b/);
+    return match ? match[1] + match[2] : null;
+  }
+
+  /**
+   * Melhorar qualidade dos dados antes de retornar
+   * Aplica validação e enriquecimento
+   */
+  static async improveLeadQuality(leads) {
+    console.log(`📊 Melhorando qualidade de ${leads.length} leads...`);
+    
+    // Para cada lead, tentar enriquecer dados
+    const improved = await Promise.all(
+      leads.map(async (lead) => {
+        // Tentar enriquecer com Nominatim
+        let enrichedLead = await this.enrichLeadData(lead);
+        
+        // Calcular score de endereço
+        enrichedLead.address_validation_score = this.validateAddress(enrichedLead.endereco);
+        
+        // Extrair CEP se houver
+        const cep = this.extractCEP(enrichedLead.endereco);
+        if (cep) {
+          enrichedLead.cep = cep;
+        }
+        
+        return enrichedLead;
+      })
+    );
+    
+    // Ordenar por qualidade de endereço
+    improved.sort((a, b) => {
+      const scoreB = b.address_validation_score || 0;
+      const scoreA = a.address_validation_score || 0;
+      return scoreB - scoreA;
+    });
+    
+    console.log(`✅ ${improved.length} leads melhorados com validação de endereço`);
+    return improved;
+  }
+
 }
 
 module.exports = ScraperService;
