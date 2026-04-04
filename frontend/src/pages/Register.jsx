@@ -26,7 +26,7 @@ export default function Register() {
       await register(nome, email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Erro ao criar conta. Tente novamente.');
+      setError(err.response?.data?.message || err.response?.data?.error || err.message || 'Erro ao criar conta. Tente novamente.');
     } finally {
       setLoading(false);
     }

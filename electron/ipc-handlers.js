@@ -21,15 +21,17 @@ ipcMain.handle('user-login', async (event, { email, password }) => {
       body: JSON.stringify({ email, senha: password }),
     });
     const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Credenciais inválidas');
+    }
     // Salvar token se sucesso
     if (data.token) {
       headers['Authorization'] = `Bearer ${data.token}`;
-      localStorage?.setItem?.('crm_token', data.token);
     }
     return data;
   } catch (error) {
-    console.error('[IPC] Erro ao fazer login:', error);
-    return { error: error.message };
+    console.error('[IPC] Erro ao fazer login:', error.message);
+    throw error;
   }
 });
 
@@ -53,10 +55,16 @@ ipcMain.handle('auth-register', async (event, userData) => {
       body: JSON.stringify(userData),
     });
     const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Erro ao registrar');
+    }
+    if (data.token) {
+      headers['Authorization'] = `Bearer ${data.token}`;
+    }
     return data;
   } catch (error) {
-    console.error('[IPC] Erro ao registrar:', error);
-    return { error: error.message };
+    console.error('[IPC] Erro ao registrar:', error.message);
+    throw error;
   }
 });
 

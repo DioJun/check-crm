@@ -18,7 +18,7 @@ export default function Login() {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Credenciais inválidas. Tente novamente.');
+      setError(err.response?.data?.message || err.response?.data?.error || err.message || 'Credenciais inválidas. Tente novamente.');
     } finally {
       setLoading(false);
     }

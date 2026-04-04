@@ -65,11 +65,23 @@ const api = {
         
         // Redirecionar para handlers específicos
         if (endpoint.startsWith('auth/login')) {
-          const result = await electronAPI.login(data.email, data.senha);
-          return { data: result };
+          try {
+            const result = await electronAPI.login(data.email, data.senha);
+            return { data: result };
+          } catch (err) {
+            const error = new Error(err.message || 'Credenciais inválidas');
+            error.response = { data: { message: err.message || 'Credenciais inválidas' }, status: 401 };
+            throw error;
+          }
         } else if (endpoint.startsWith('auth/register')) {
-          const result = await electronAPI.invoke('auth-register', data);
-          return { data: result };
+          try {
+            const result = await electronAPI.invoke('auth-register', data);
+            return { data: result };
+          } catch (err) {
+            const error = new Error(err.message || 'Erro ao registrar');
+            error.response = { data: { message: err.message || 'Erro ao registrar' }, status: 400 };
+            throw error;
+          }
         } else if (endpoint.startsWith('scraper/search')) {
           const result = await electronAPI.searchLeads(data.searchTerm);
           return { data: result };
