@@ -1,6 +1,9 @@
 /**
  * Serviço de Scraping de Google Maps
  * Extrai dados de negócios: nome, telefone, endereço, avaliação
+ * 
+ * ⚠️ IMPORTANTE: Puppeteer funciona APENAS localmente
+ * Em Vercel/cloud, use URL scraping de lugares específicos (/place/)
  */
 
 const { URLSearchParams } = require('url');
@@ -63,16 +66,14 @@ class ScraperService {
   }
 
   /**
-   * Extrai dados da URL do Google Maps usando estratégia alternativa
+   * Extrai dados da URL do Google Maps
    */
   static async extractDataFromUrl(url) {
     console.log('🔗 URL recebida:', url);
     
     // Se for apenas um parâmetro/código, é uma URL compartilhada
-    // Tentar reconstruir URL completa se necessário
     let fullUrl = url;
     if (!url.startsWith('http') && url.length > 0) {
-      // Pode ser um código compartilhado ou parte de URL
       fullUrl = `https://maps.google.com/?q=${encodeURIComponent(url)}`;
       console.log('🔗 URL reconstruída:', fullUrl);
     }
@@ -91,7 +92,7 @@ class ScraperService {
 
     if (isPlaceUrl) {
       console.log('📍 Detectado: URL de LUGAR (estático)');
-      // Estratégia 1: Tentar extrair dados diretos da URL
+      // Estrat\u00e9gia 1: Tentar extrair dados diretos da URL
       const dataFromUrl = this.parseGoogleMapsUrl(fullUrl);
       
       if (dataFromUrl.nome || (dataFromUrl.latitude && dataFromUrl.longitude)) {
@@ -167,21 +168,15 @@ class ScraperService {
   }
 
   /**
-   * Obtém dados de negócio através de coordenadas (método alternativo)
-   * Nota: Isso é uma simulação. Em produção, usar API do Google Maps
+   * Obtém dados de negócio através de coordenadas
    */
   static async getBusinessDataByCoordinates(data) {
-    console.log('📍 Buscando dados por coordenadas...');
+    console.log('📍 Extraindo dados da URL...');
     
-    // Se não tem nome mas tem coordenadas, tentar fazer busca reversa
     if (!data.nome && data.latitude && data.longitude) {
       console.log(`Coordenadas: ${data.latitude}, ${data.longitude}`);
-      // Em produção, aqui entraria Geocoding reverso
-      return null;
     }
     
-    // Aqui entraria integração com Google Maps API
-    // Por enquanto, retornamos os dados parseados como base
     if (data.nome || data.endereco) {
       return {
         ...data,
@@ -194,11 +189,10 @@ class ScraperService {
   }
 
   /**
-   * Scrape com browser headless (Puppeteer)
-   * Requer: npm install puppeteer
+   * Scrape com browser headless (Puppeteer) - LOCAL ONLY
    */
   static async scrapeWithHeadlessBrowser(url) {
-    console.log('🤖 Iniciando scrape com browser headless...');
+    console.log('🤖 Tentando extrair com browser headless...');
     
     try {
       const puppeteer = require('puppeteer');
@@ -228,86 +222,34 @@ class ScraperService {
           telefone: '[data-tooltip*="Telefone"], a[href^="tel:"]',
           endereco: '[data-tooltip*="Endereço"], .section-copy-content',
           avaliacoes: '.section-star-display, .rating-span',
-          website: 'a[data-tooltip*="Site"], a[href^="http"]:not([href*="maps"])'
         };
 
-        // Tentar encontrar elementos
-        for (const [key, selector] of Object.entries(selectors)) {
-          const elem = document.querySelector(selector);
-          if (elem) {
-            data[key] = elem.textContent.trim();
+        // Tentar extrair usando os seletores
+        Object.keys(selectors).forEach(key => {
+          const element = document.querySelector(selectors[key]);
+          if (element) {
+            data[key] = element.innerText || element.textContent;
           }
-        }
+        });
 
         return data;
       });
 
       await browser.close();
-      return { ...data, fonte: 'puppeteer', confianca: 'alta' };
+      
+      return data.nome ? [data] : [];
 
     } catch (error) {
-      console.warn('⚠️ Puppeteer não disponível, usando método alternativo');
-      return this.parseGoogleMapsUrl(url);
+      console.error('❌ Browser headless falhou:', error.message);
+      throw error;
     }
   }
 
   /**
-   * Validar e normalizar dados extraídos
-   */
-  static normalizarDados(data) {
-    return {
-      nome: data.nome?.trim() || null,
-      telefone: this.normalizarTelefone(data.telefone),
-      endereco: data.endereco?.trim() || null,
-      avaliacoes: data.avaliacoes ? parseFloat(data.avaliacoes) : null,
-      website: this.normalizarUrl(data.website),
-      source: 'google_maps',
-      scrapedAt: new Date()
-    };
-  }
-
-  /**
-   * Normaliza número de telefone
-   */
-  static normalizarTelefone(telefone) {
-    if (!telefone) return null;
-    
-    // Remove caracteres especiais
-    let normalizado = telefone.replace(/\D/g, '');
-    
-    // Se tem 11 dígitos, adicionar +55
-    if (normalizado.length === 11) {
-      normalizado = '55' + normalizado;
-    }
-    
-    // Se não tem +, adicionar
-    if (!normalizado.startsWith('+')) {
-      normalizado = '+' + normalizado;
-    }
-    
-    return normalizado;
-  }
-
-  /**
-   * Normaliza URL
-   */
-  static normalizarUrl(website) {
-    if (!website) return null;
-    if (!website.startsWith('http')) {
-      website = 'https://' + website;
-    }
-    try {
-      new URL(website);
-      return website;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Pesquisa Google Maps por termo (ex: "mecânicos em joinville")
-   * @param {string} searchTerm - Termo de pesquisa (ex: "mecânicos em joinville")
-   * @returns {Promise<Array>} Lista de resultados encontrados
+   * BUSCA POR TERMO - Funciona APENAS LOCALMENTE com Puppeteer
+   * 
+   * Em Vercel/cloud: Retorna erro claro
+   * Localmente: Usa Puppeteer para buscar e coletar múltiplos resultados
    */
   static async searchGoogleMaps(searchTerm) {
     console.log(`🔎 Iniciando busca: "${searchTerm}"`);
@@ -323,9 +265,24 @@ class ScraperService {
       return scrapCache.get(cacheKey);
     }
 
+    // Verificar se Puppeteer está disponível
     try {
-      console.log('🤖 Tentando Puppeteer (timeout: 60s)...');
+      require.resolve('puppeteer');
+    } catch (e) {
+      throw new Error(
+        '❌ Busca por termo não disponível neste ambiente (Puppeteer não instalado). ' +
+        '\n\n📝 Solução: Execute o CRM LOCALMENTE para usar busca por termo, ' +
+        'ou paste uma URL de um lugar específico do Google Maps.'
+      );
+    }
+
+    try {
+      console.log('🚀 Usando Puppeteer para buscar (LOCAL)...');
       const results = await this.searchWithPuppeteer(searchTerm);
+
+      if (!results || results.length === 0) {
+        throw new Error('Nenhum resultado encontrado');
+      }
 
       // Cachear por 24 horas
       scrapCache.set(cacheKey, results);
@@ -334,65 +291,26 @@ class ScraperService {
       return results;
       
     } catch (puppeteerError) {
-      console.error('❌ Puppeteer falhou:', puppeteerError.message);
-      console.error('Stack:', puppeteerError.stack?.substring(0, 500));
+      console.error('❌ Busca falhou:', puppeteerError.message);
       
-      throw new Error(`Puppeteer error: ${puppeteerError.message || 'Timeout ou erro desconhecido'}. Verifique se pode usar a busca por URL do Google Maps ao invés.`);
+      throw new Error(
+        `Busca falhou: ${puppeteerError.message}.\n\n` +
+        'Execute o CRM localmente ou use URL de um lugar específico.'
+      );
     }
   }
 
   /**
-   * Método alternativo mais leve (sem Puppeteer)
-   */
-  static async searchWithAlternativeMethod(searchTerm) {
-    console.log('📡 Usando método alternativo...');
-    
-    try {
-      const fetch = require('node-fetch');
-      
-      // Tentar busca com timeout curto
-      const searchUrl = `https://www.google.com.br/maps/search/${encodeURIComponent(searchTerm)}`;
-      
-      console.log(`Acessando: ${searchUrl}`);
-      
-      const response = await fetch(searchUrl, {
-        timeout: 8000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} - Servidor não respondeu`);
-      }
-      
-      const html = await response.text();
-      
-      // Google Maps renderiza com JavaScript, fetch puro não consegue
-      console.warn('⚠️ Método leve não conseguiu extrair dados (Google Maps usa JavaScript)');
-      throw new Error('Método alternativo insuficiente para Google Maps');
-      
-    } catch (error) {
-      throw new Error(`Método alternativo falhou: ${error.message}`);
-    }
-  }
-
-  /**
-   * Pesquisa com Puppeteer (browser headless)
+   * Busca com Puppeteer - APENAS LOCAL
    * Coleta múltiplos resultados de pesquisa
    */
   static async searchWithPuppeteer(searchTerm) {
-    console.log('🤖 Iniciando busca com Puppeteer...');
+    console.log(`🌐 Buscando "${searchTerm}" com Puppeteer...`);
     
     try {
-      let puppeteer;
-      try {
-        puppeteer = require('puppeteer');
-      } catch (e) {
-        throw new Error('Puppeteer não instalado no ambiente');
-      }
+      const puppeteer = require('puppeteer');
 
-      console.log('📲 Lançando browser (Chrome)...');
+      console.log('🚀 Lançando browser...');
       const browser = await puppeteer.launch({
         headless: 'new',
         args: [
@@ -400,9 +318,6 @@ class ScraperService {
           '--disable-setuid-sandbox',
           '--disable-gpu',
           '--disable-dev-shm-usage',
-          '--disable-extensions',
-          '--disable-web-resources',
-          '--disable-component-extensions-with-background-pages',
         ],
         timeout: 60000
       });
@@ -410,76 +325,95 @@ class ScraperService {
       const page = await browser.newPage();
       await page.setViewport({ width: 1366, height: 768 });
       
-      // Construir URL de pesquisa do Google Maps
       const searchUrl = `https://www.google.com.br/maps/search/${encodeURIComponent(searchTerm)}`;
+      console.log(`📍 Acessando: ${searchUrl}`);
       
-      console.log(`📍 Acessando: ${searchUrl.substring(0, 80)}...`);
-      
-      // Navegação com timeout maior
       await page.goto(searchUrl, { 
         waitUntil: 'networkidle2', 
         timeout: 60000 
       });
 
-      console.log('⏳ Aguardando renderização...');
+      console.log('⏳ Aguardando resultados...');
       await page.waitForTimeout(5000);
 
-      // Extrair lista de resultados
+      // Extrair resultados
       const results = await page.evaluate(() => {
         const items = [];
         
-        // Estratégia 1: role="option"
-        let searchResults = document.querySelectorAll('[role="option"]');
+        // Procurar por elementos de resultado
+        const searchResults = document.querySelectorAll('[role="option"]');
         
-        console.log(`[page] Encontrados ${searchResults.length} com role=option`);
-        
-        if (searchResults.length === 0) {
-          // Estratégia 2: outros seletores
-          searchResults = document.querySelectorAll('[jsaction*="click"][data-index]');
-          console.log(`[page] Tentativa 2: ${searchResults.length}`);
-        }
-
         searchResults.forEach((result, index) => {
-          if (index < 20 && result.textContent.length > 10) {
-            try {
-              const text = result.innerText;
+          if (index < 20) {
+            const text = result.innerText || result.textContent;
+            if (text && text.length > 5) {
               const lines = text.split('\n').filter(l => l.trim());
               
-              if (lines.length > 0) {
-                items.push({
-                  nome: lines[0]?.substring(0, 80) || 'Unknown',
-                  endereco: lines[lines.length - 1]?.substring(0, 100) || '',
-                  avaliacoes: lines.find(l => l.includes('★')) || '',
-                  website: null,
-                  telefone: null,
-                  latitude: null,
-                  longitude: null
-                });
-              }
-            } catch (e) {
-              // ignorar
+              items.push({
+                nome: lines[0] || 'Sem nome',
+                endereco: lines[1] || lines[2] || 'Endereço não disponível',
+                avaliacoes: lines.find(l => l.includes('⭐') || l.includes('★')) || '',
+                fonte: 'google_maps_search'
+              });
             }
           }
         });
-        
+
         return items;
       });
 
       await browser.close();
 
-      if (results.length === 0) {
-        throw new Error(`Nenhum resultado encontrado para "${searchTerm}"`);
-      }
-
-      console.log(`✅ ${results.length} resultados extraídos`);
+      console.log(`✅ Encontrados ${results.length} resultados`);
       return results;
 
     } catch (error) {
-      console.error('❌ Erro em Puppeteer:', error.message);
-      throw error;
+      console.error('❌ Puppeteer error:', error.message);
+      throw new Error(`Puppeteer falhou: ${error.message}`);
     }
   }
 
+  /**
+   * Faz scrape de múltiplas URLs
+   */
+  static async scrapeBatch(urls) {
+    console.log(`🔄 Fazendo scrape de ${urls.length} URLs...`);
+    
+    const results = [];
+    const errors = [];
+
+    for (const url of urls) {
+      try {
+        const data = await this.scrapeGoogleMaps(url);
+        results.push({ url, data, success: true });
+      } catch (error) {
+        errors.push({ url, error: error.message });
+      }
+    }
+
+    return { results, errors };
+  }
+
+  /**
+   * Normaliza dados para o formato esperado
+   */
+  static normalizarDados(dados) {
+    if (!Array.isArray(dados)) {
+      dados = [dados];
+    }
+
+    return dados.map(item => ({
+      nome: item.nome || 'Sem nome',
+      endereco: item.endereco || 'Não informado',
+      telefone: item.telefone || null,
+      website: item.website || null,
+      avaliacoes: item.avaliacoes || 'Sem avaliação',
+      horario: item.horario || null,
+      latitude: item.latitude || null,
+      longitude: item.longitude || null,
+      fonte: item.fonte || 'unknown'
+    }));
+  }
 }
 
 module.exports = ScraperService;
