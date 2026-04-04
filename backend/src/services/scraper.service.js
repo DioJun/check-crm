@@ -1,12 +1,38 @@
 /**
  * Serviço de Scraping de Google Maps
  * Extrai dados de negócios: nome, telefone, endereço, avaliação
- * 
- * ⚠️ IMPORTANTE: Puppeteer funciona APENAS localmente
- * Em Vercel/cloud, use URL scraping de lugares específicos (/place/)
+ *
+ * Puppeteer-extra + stealth para evasão de detecção
+ * Scroll automático, User-Agent rotation, delays humanizados
  */
 
 const { URLSearchParams } = require('url');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+puppeteer.use(StealthPlugin());
+
+// ==================== CONFIGURAÇÃO ====================
+
+// Pool de User-Agents reais (Chrome Windows/Mac/Linux recentes)
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+];
+
+function randomUA() {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+/** Delay humanizado: base ± jitter ms */
+function humanDelay(baseMs = 1000, jitter = 500) {
+  const ms = baseMs + Math.floor(Math.random() * jitter * 2) - jitter;
+  return new Promise(r => setTimeout(r, Math.max(200, ms)));
+}
 
 // Cache em memória (em produção, usar Redis)
 const scrapCache = new Map();
@@ -189,60 +215,97 @@ class ScraperService {
   }
 
   /**
-   * Scrape com browser headless (Puppeteer) - LOCAL ONLY
+   * Scrape com browser headless (Puppeteer+Stealth) - LOCAL ONLY
+   * Extrai dados de um lugar específico (/place/) do Google Maps
    */
   static async scrapeWithHeadlessBrowser(url) {
-    console.log('🤖 Tentando extrair com browser headless...');
-    
+    console.log('🤖 Extraindo lugar com Puppeteer Stealth...');
+
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-infobars',
+      ],
+    });
+
     try {
-      const puppeteer = require('puppeteer');
-      
-      const browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-      });
-
       const page = await browser.newPage();
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+      const ua = randomUA();
+      await page.setUserAgent(ua);
+      await page.setViewport({ width: 1366, height: 768 });
+      // Definir idioma pt-BR para seletores consistentes
+      await page.setExtraHTTPHeaders({ 'Accept-Language': 'pt-BR,pt;q=0.9' });
 
-      // Extrair dados da página
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+      await humanDelay(2000, 800);
+
+      // Fechar popups de consentimento se aparecerem
+      await this._dismissConsent(page);
+
+      // Extrair dados usando seletores estáveis do Google Maps
       const data = await page.evaluate(() => {
-        const data = {
+        const result = {
           nome: null,
           telefone: null,
           endereco: null,
           avaliacoes: null,
           website: null,
-          horario: null
+          horario: null,
         };
 
-        // Selectors para Google Maps
-        const selectors = {
-          nome: 'h1, [data-item-id*="name"] h2, .section-star-display-title',
-          telefone: '[data-tooltip*="Telefone"], a[href^="tel:"]',
-          endereco: '[data-tooltip*="Endereço"], .section-copy-content',
-          avaliacoes: '.section-star-display, .rating-span',
-        };
+        // NOME — h1 principal ou aria-label do header
+        const h1 = document.querySelector('h1');
+        if (h1) result.nome = h1.textContent.trim();
 
-        // Tentar extrair usando os seletores
-        Object.keys(selectors).forEach(key => {
-          const element = document.querySelector(selectors[key]);
-          if (element) {
-            data[key] = element.innerText || element.textContent;
-          }
-        });
+        // TELEFONE — botão com aria-label "Telefone:" ou link tel:
+        const phoneBtn = document.querySelector('a[data-item-id^="phone:"], a[href^="tel:"], button[data-item-id^="phone:"]');
+        if (phoneBtn) {
+          const label = phoneBtn.getAttribute('aria-label') || phoneBtn.textContent || '';
+          const m = label.match(/\(?\d{2,3}\)?\s*\d{4,5}[\s.-]?\d{4}/);
+          if (m) result.telefone = m[0];
+        }
 
-        return data;
+        // ENDEREÇO — botão com data-item-id="address"
+        const addrBtn = document.querySelector('button[data-item-id="address"], [data-item-id="address"]');
+        if (addrBtn) {
+          result.endereco = (addrBtn.getAttribute('aria-label') || addrBtn.textContent || '').replace(/^Endereço:\s*/i, '').trim();
+        }
+
+        // AVALIAÇÃO — span com role="img" perto de estrelas
+        const ratingEl = document.querySelector('div.F7nice span[aria-hidden="true"], span.ceNzKf, div[jsaction*="pane.rating"] span');
+        if (ratingEl) result.avaliacoes = ratingEl.textContent.trim();
+
+        // WEBSITE — link com data-item-id="authority"
+        const webBtn = document.querySelector('a[data-item-id="authority"], a[data-item-id^="olak"]');
+        if (webBtn) result.website = webBtn.href || webBtn.getAttribute('aria-label') || null;
+
+        // HORÁRIO — item com aria-label contendo "horário"
+        const hourEl = document.querySelector('[data-item-id="oh"], [aria-label*="horário"], [aria-label*="Horário"]');
+        if (hourEl) result.horario = (hourEl.getAttribute('aria-label') || hourEl.textContent || '').trim();
+
+        return result;
       });
 
-      await browser.close();
-      
       return data.nome ? [data] : [];
-
-    } catch (error) {
-      console.error('❌ Browser headless falhou:', error.message);
-      throw error;
+    } finally {
+      await browser.close();
     }
+  }
+
+  /**
+   * Fecha popups de consentimento/cookies do Google
+   */
+  static async _dismissConsent(page) {
+    try {
+      const consentBtn = await page.$('button[aria-label="Aceitar tudo"], form[action*="consent"] button, button[jsname="b3VHJd"]');
+      if (consentBtn) {
+        await consentBtn.click();
+        await humanDelay(1000, 400);
+      }
+    } catch { /* sem popup */ }
   }
 
   /**
@@ -446,178 +509,216 @@ class ScraperService {
   }
 
   /**
-   * Busca com Puppeteer - APENAS LOCAL
-   * Coleta múltiplos resultados de pesquisa
+   * Busca com Puppeteer Stealth + scroll automático - APENAS LOCAL
+   * Coleta múltiplos resultados rolando a lista lateral do Google Maps
    */
   static async searchWithPuppeteer(searchTerm) {
-    console.log(`🌐 Buscando "${searchTerm}" com Puppeteer...`);
-    
+    console.log(`🌐 Buscando "${searchTerm}" com Puppeteer Stealth...`);
+
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-infobars',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--window-size=1366,768',
+      ],
+      timeout: 60000,
+    });
+
     try {
-      const puppeteer = require('puppeteer');
-
-      console.log('🚀 Lançando browser...');
-      const browser = await puppeteer.launch({
-        headless: 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-gpu',
-          '--disable-dev-shm-usage',
-        ],
-        timeout: 60000
-      });
-
       const page = await browser.newPage();
+      const ua = randomUA();
+      await page.setUserAgent(ua);
       await page.setViewport({ width: 1366, height: 768 });
-      
+      await page.setExtraHTTPHeaders({ 'Accept-Language': 'pt-BR,pt;q=0.9' });
+      console.log(`🕵️ UA: ${ua.substring(0, 60)}...`);
+
       const searchUrl = `https://www.google.com.br/maps/search/${encodeURIComponent(searchTerm)}`;
       console.log(`📍 Acessando: ${searchUrl}`);
-      
-      await page.goto(searchUrl, { 
-        waitUntil: 'networkidle2', 
-        timeout: 60000 
+
+      await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+      await humanDelay(3000, 1000);
+
+      // Fechar popup de consentimento
+      await this._dismissConsent(page);
+      await humanDelay(1500, 500);
+
+      // ─── SCROLL AUTOMÁTICO DA LISTA LATERAL ───
+      // O painel de resultados usa role="feed" ou é um div scrollável na lateral esquerda
+      console.log('📜 Iniciando scroll automático da lista de resultados...');
+
+      const scrollResults = await page.evaluate(async () => {
+        // Localizar o container scrollável dos resultados
+        // Google Maps usa role="feed" ou um div com overflow-y dentro do painel lateral
+        const feed = document.querySelector('div[role="feed"]');
+        const scrollContainer = feed
+          || document.querySelector('div[aria-label*="Resultados"] div[tabindex="-1"]')
+          || document.querySelector('.m6QErb.DxyBCb');
+
+        if (!scrollContainer) {
+          console.log('[scroll] Container de resultados não encontrado');
+          return { scrolled: false, attempts: 0 };
+        }
+
+        let previousHeight = 0;
+        let stableCount = 0;
+        let scrollAttempts = 0;
+        const MAX_SCROLLS = 12; // ~60 resultados máx
+        const MAX_STABLE = 3; // parar se altura não muda 3x seguidas
+
+        while (scrollAttempts < MAX_SCROLLS && stableCount < MAX_STABLE) {
+          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          scrollAttempts++;
+
+          // Delay humanizado (400-800ms) — executado dentro do page context
+          await new Promise(r => setTimeout(r, 400 + Math.floor(Math.random() * 400)));
+
+          const currentHeight = scrollContainer.scrollHeight;
+          if (currentHeight === previousHeight) {
+            stableCount++;
+          } else {
+            stableCount = 0;
+          }
+          previousHeight = currentHeight;
+        }
+
+        // Verificar se encontrou o marcador de "fim dos resultados"
+        const endMarker = document.querySelector('span.HlvSq, p[jstcache]');
+        return {
+          scrolled: true,
+          attempts: scrollAttempts,
+          reachedEnd: !!endMarker,
+        };
       });
 
-      console.log('⏳ Aguardando renderização completa...');
-      // Aguardar mais tempo para elementos renderizarem
-      await new Promise(resolve => setTimeout(resolve, 8000));
+      console.log(`📜 Scroll: ${scrollResults.attempts} iterações, fim=${scrollResults.reachedEnd}`);
+      await humanDelay(2000, 500);
 
-      // Tentar esperar por seletores específicos (com timeout)
-      try {
-        await page.waitForSelector('[role="option"]', { timeout: 5000 }).catch(() => {
-          console.log('⚠️ [role="option"] não encontrado dentro do timeout');
-        });
-      } catch (e) {
-        console.log('⚠️ Seletor [role="option"] não disponível');
-      }
+      // ─── EXTRAÇÃO COM SELETORES ESTÁVEIS ───
+      console.log('🔍 Extraindo resultados com seletores aria-label/data-*...');
 
-      // Extrair resultados - ESTRATÉGIA INTELIGENTE COM FILTROS RIGOROSOS
       const results = await page.evaluate(() => {
         const items = [];
         const seenNames = new Set();
         const seenPhones = new Set();
-        
-        // ESTRATÉGIA: Procurar por divs que parecem ser containers de resultado
-        // Um container válido tem: NOME (linha 1) + DADOS (linhas 2+)
-        // Evitar divs que são fragmentos (tipo só um endereço)
-        
-        const allDivs = Array.from(document.querySelectorAll('div'));
-        console.log(`[page] Analisando ${allDivs.length} divs...`);
-        
-        allDivs.forEach(div => {
-          if (items.length >= 20) return;
-          
-          // Obter texto do div
-          const text = (div.innerText || div.textContent || '').trim();
-          
-          // FILTRO 1: Tamanho válido
-          if (text.length < 15 || text.length > 600) return;
-          
-          // Dividir em linhas
-          let lines = text.split('\n')
-            .map(l => l.trim())
-            .filter(l => l && l.length > 0 && l.length < 200);
-          
-          // FILTRO 2: Precisa ter PELO MENOS 2 linhas
-          if (lines.length < 2) return;
-          
-          // FILTRO 3: Primeira linha é o potencial NOME
-          let potentialName = lines[0];
-          
-          // FILTRO 4: "Eletricista · Rua ..." = ENDEREÇO, não nome
-          if (potentialName.includes('·') && /\d+/.test(potentialName)) {
-            return;
-          }
-          
-          // FILTRO 5: Ignorar UI keywords
-          const uiKeywords = [
-            'Recolher', 'Abrir', 'Compartilhar', 'Classificação', 
-            'Filtro', 'Menu', 'Ajuda', 'Configurações', 'Resultado',
-            '© Google', 'Mapa', 'Termos', 'Privacidade', 'Contribua',
-            'Central de', 'Verificado'
-          ];
-          
-          if (uiKeywords.some(kw => potentialName.includes(kw))) return;
-          
-          // FILTRO 6: Nome deve ter tamanho razoável
-          if (potentialName.length < 3 || potentialName.length > 80) return;
-          
-          // FILTRO 7: Não pode ser duplicado por nome
-          if (seenNames.has(potentialName)) return;
-          
-          // Procurar por dados comerciais válidos
-          let hasBusinessData = false;
-          let endereco = '';
-          let telefone = '';
-          let avaliacoes = '';
-          
-          for (let i = 1; i < lines.length; i++) {
-            const line = lines[i];
-            
-            // Telefone: (XX) XXXXX-XXXX — extrair SÓ o padrão do telefone, não a linha toda
-            const phoneMatch = line.match(/\(\d{2,3}\)\s*\d{4,5}-\d{3,4}/);
-            if (phoneMatch && !telefone) {
-              telefone = phoneMatch[0];
-              hasBusinessData = true;
-            }
-            
-            // Endereço: "Rua ..." ou "Av. ..." com número
-            if (/\d+/.test(line) && line.length > 8 && (
-              line.includes('Rua') || line.includes('Av.') || line.includes('Avenida') ||
-              line.includes('Praça') || line.includes('Travessa') || line.includes('Pça') ||
-              /^[RC]\./.test(line) || 
-              /\b\d{5}-\d{3}\b/.test(line)
-            )) {
-              if (!endereco) {
+
+        // SELETOR PRIMÁRIO: cada resultado é um <a> com class "hfpxzc" e aria-label
+        const resultLinks = document.querySelectorAll('a.hfpxzc');
+
+        if (resultLinks.length > 0) {
+          resultLinks.forEach(link => {
+            if (items.length >= 60) return;
+
+            const nome = (link.getAttribute('aria-label') || '').trim();
+            if (!nome || nome.length < 3 || seenNames.has(nome)) return;
+
+            // O container pai contém todos os dados
+            const card = link.closest('[jsaction*="mouseover"]') || link.parentElement?.parentElement;
+            if (!card) { seenNames.add(nome); items.push({ nome, endereco: '', telefone: '', avaliacoes: '', fonte: 'google_maps_search' }); return; }
+
+            const cardText = card.innerText || '';
+            const lines = cardText.split('\n').map(l => l.trim()).filter(Boolean);
+
+            let endereco = '';
+            let telefone = '';
+            let avaliacoes = '';
+
+            for (const line of lines) {
+              // Telefone
+              if (!telefone) {
+                const pm = line.match(/\(?\d{2,3}\)?\s*\d{4,5}[\s.-]?\d{4}/);
+                if (pm) { telefone = pm[0]; continue; }
+              }
+              // Avaliação (ex: "4,5" seguido de estrelas ou "(123)")
+              if (!avaliacoes && /^\d[.,]\d/.test(line)) {
+                avaliacoes = line;
+                continue;
+              }
+              // Endereço
+              if (!endereco && line.length > 10 && (
+                /\b(Rua|Av\.|Avenida|Praça|Travessa|Trav\.|Rod\.|Estrada|R\.)\b/i.test(line) ||
+                /\b\d{5}-?\d{3}\b/.test(line) ||
+                (line.includes(',') && /\d/.test(line) && !line.includes('·'))
+              )) {
                 endereco = line;
-                hasBusinessData = true;
               }
             }
-            
-            // Avaliação: ⭐ ou horário
-            if (/⭐|★|\d+,\d+\s*\(|\bAberto\b|\bFechado\b/.test(line)) {
-              avaliacoes = line;
-              hasBusinessData = true;
+
+            // Telefone alternativo: procurar link tel: dentro do card
+            if (!telefone) {
+              const telLink = card.querySelector('a[href^="tel:"]');
+              if (telLink) {
+                const m = (telLink.href || '').match(/\d[\d\s()-]{8,}/);
+                if (m) telefone = m[0].trim();
+              }
             }
-          }
-          
-          // FILTRO 8: Precisa ter pelo menos 1 dado comercial válido
-          if (!hasBusinessData) return;
-          
-          // FILTRO 9: Se tem telefone, não pode ser duplicado por telefone
-          if (telefone) {
-            if (seenPhones.has(telefone)) {
-              console.log(`[page] Skip phone duplicate: ${telefone}`);
-              return;
-            }
-            seenPhones.add(telefone);
-          }
-          
-          // ✓ PASSOU EM TODOS OS FILTROS
-          seenNames.add(potentialName);
-          items.push({
-            nome: potentialName.substring(0, 100),
-            endereco: endereco.substring(0, 150),
-            telefone: telefone.substring(0, 50),
-            avaliacoes: avaliacoes.substring(0, 100),
-            fonte: 'google_maps_search'
+
+            if (telefone && seenPhones.has(telefone)) return;
+            if (telefone) seenPhones.add(telefone);
+            seenNames.add(nome);
+
+            items.push({
+              nome: nome.substring(0, 100),
+              endereco: endereco.substring(0, 150),
+              telefone: telefone.substring(0, 50),
+              avaliacoes: avaliacoes.substring(0, 100),
+              fonte: 'google_maps_search',
+            });
           });
-          
-          console.log(`[page] ✓ ${potentialName}`);
-        });
-        
-        console.log(`[page] Total de ${items.length} leads extraídos`);
+        }
+
+        // FALLBACK: Se o seletor primário falhou, usar análise de divs
+        if (items.length === 0) {
+          const allDivs = Array.from(document.querySelectorAll('div'));
+          allDivs.forEach(div => {
+            if (items.length >= 30) return;
+            const text = (div.innerText || '').trim();
+            if (text.length < 15 || text.length > 600) return;
+
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l && l.length < 200);
+            if (lines.length < 2) return;
+
+            const potentialName = lines[0];
+            if (potentialName.length < 3 || potentialName.length > 80) return;
+            if (seenNames.has(potentialName)) return;
+
+            const uiWords = ['Recolher','Abrir','Compartilhar','Filtro','Menu','Ajuda','©','Mapa','Termos','Privacidade','Verificado'];
+            if (uiWords.some(w => potentialName.includes(w))) return;
+
+            let endereco = '', telefone = '', avaliacoes = '', hasData = false;
+            for (let i = 1; i < lines.length; i++) {
+              const line = lines[i];
+              const pm = line.match(/\(?\d{2,3}\)?\s*\d{4,5}[\s.-]?\d{4}/);
+              if (pm && !telefone) { telefone = pm[0]; hasData = true; }
+              if (!endereco && /\d+/.test(line) && line.length > 8 && /\b(Rua|Av\.|Avenida|Praça|Travessa|R\.)\b/i.test(line)) { endereco = line; hasData = true; }
+              if (/⭐|★|\d+[.,]\d+\s*\(|\bAberto\b|\bFechado\b/.test(line)) { avaliacoes = line; hasData = true; }
+            }
+            if (!hasData) return;
+            if (telefone && seenPhones.has(telefone)) return;
+            if (telefone) seenPhones.add(telefone);
+            seenNames.add(potentialName);
+
+            items.push({
+              nome: potentialName.substring(0, 100),
+              endereco: endereco.substring(0, 150),
+              telefone: telefone.substring(0, 50),
+              avaliacoes: avaliacoes.substring(0, 100),
+              fonte: 'google_maps_search',
+            });
+          });
+        }
+
         return items;
       });
 
-      await browser.close();
-
       console.log(`✅ Encontrados ${results.length} resultados`);
       return results;
-
-    } catch (error) {
-      console.error('❌ Puppeteer error:', error.message);
-      throw new Error(`Puppeteer falhou: ${error.message}`);
+    } finally {
+      await browser.close();
     }
   }
 
