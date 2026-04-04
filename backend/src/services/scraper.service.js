@@ -482,100 +482,121 @@ class ScraperService {
         console.log('⚠️ Seletor [role="option"] não disponível');
       }
 
-      // Extrair resultados - ESTRATÉGIA ROBUSTA
+      // Extrair resultados - ESTRATÉGIA INTELIGENTE COM FILTROS RIGOROSOS
       const results = await page.evaluate(() => {
         const items = [];
         const seenNames = new Set();
+        const seenPhones = new Set();
         
-        // Buscar TODOS os divs e analisá-los
+        // ESTRATÉGIA: Procurar por divs que parecem ser containers de resultado
+        // Um container válido tem: NOME (linha 1) + DADOS (linhas 2+)
+        // Evitar divs que são fragmentos (tipo só um endereço)
+        
         const allDivs = Array.from(document.querySelectorAll('div'));
-        
         console.log(`[page] Analisando ${allDivs.length} divs...`);
         
         allDivs.forEach(div => {
           if (items.length >= 20) return;
           
-          // Obter texto do div e seus filhos
+          // Obter texto do div
           const text = (div.innerText || div.textContent || '').trim();
           
-          // Pular divs vazios ou muito pequenos
-          if (text.length < 10 || text.length > 500) return;
+          // FILTRO 1: Tamanho válido
+          if (text.length < 15 || text.length > 600) return;
           
           // Dividir em linhas
           let lines = text.split('\n')
             .map(l => l.trim())
             .filter(l => l && l.length > 0 && l.length < 200);
           
-          if (lines.length < 1) return;
+          // FILTRO 2: Precisa ter PELO MENOS 2 linhas
+          if (lines.length < 2) return;
           
-          // Primeira linha é potencialmente o NOME
-          const potentialName = lines[0];
+          // FILTRO 3: Primeira linha é o potencial NOME
+          let potentialName = lines[0];
           
-          // FILTRAR UI ELEMENTS
+          // FILTRO 4: "Eletricista · Rua ..." = ENDEREÇO, não nome
+          if (potentialName.includes('·') && /\d+/.test(potentialName)) {
+            return;
+          }
+          
+          // FILTRO 5: Ignorar UI keywords
           const uiKeywords = [
             'Recolher', 'Abrir', 'Compartilhar', 'Classificação', 
             'Filtro', 'Menu', 'Ajuda', 'Configurações', 'Resultado',
-            '© Google', 'Mapa', 'Termos', 'Privacidade', 'Contribua'
+            '© Google', 'Mapa', 'Termos', 'Privacidade', 'Contribua',
+            'Central de', 'Verificado'
           ];
           
-          // Pular se tiver palavras-chave de UI
           if (uiKeywords.some(kw => potentialName.includes(kw))) return;
           
-          // Nome deve ter tamanho razoável (3-80 chars)
+          // FILTRO 6: Nome deve ter tamanho razoável
           if (potentialName.length < 3 || potentialName.length > 80) return;
           
-          // Pular se já adicionado
+          // FILTRO 7: Não pode ser duplicado por nome
           if (seenNames.has(potentialName)) return;
           
-          // Procurar por padrões de negócio (endereço, telefone, rating)
-          let hasBusinessPattern = false;
+          // Procurar por dados comerciais válidos
+          let hasBusinessData = false;
           let endereco = '';
           let telefone = '';
           let avaliacoes = '';
           
-          for (let i = 1; i < lines.length && i < 5; i++) {
+          for (let i = 1; i < lines.length; i++) {
             const line = lines[i];
             
-            // Padrão de endereço: tem números (street number)
-            if (/\d+/.test(line) && line.length > 5) {
-              endereco = line;
-              hasBusinessPattern = true;
-            }
-            
-            // Padrão de telefone: (XX) XXXXX-XXXX
+            // Telefone: (XX) XXXXX-XXXX
             if (/\(\d{2,3}\)\s*\d{4,5}-\d{3,4}/.test(line)) {
               telefone = line;
-              hasBusinessPattern = true;
+              hasBusinessData = true;
             }
             
-            // Padrão de rating: ⭐4,5 (100) ou similar
-            if (/⭐|★|\d+,\d+\s*\(/.test(line)) {
+            // Endereço: "Rua ..." ou "Av. ..." com número
+            if (/\d+/.test(line) && line.length > 8 && (
+              line.includes('Rua') || line.includes('Av.') || line.includes('Avenida') ||
+              line.includes('Praça') || line.includes('Travessa') || line.includes('Pça') ||
+              /^[RC]\./.test(line) || 
+              /\b\d{5}-\d{3}\b/.test(line)
+            )) {
+              if (!endereco) {
+                endereco = line;
+                hasBusinessData = true;
+              }
+            }
+            
+            // Avaliação: ⭐ ou horário
+            if (/⭐|★|\d+,\d+\s*\(|\bAberto\b|\bFechado\b/.test(line)) {
               avaliacoes = line;
-              hasBusinessPattern = true;
-            }
-            
-            // Padrão de horário: "Aberto" ou "Fechado"
-            if (/Aberto|Fechado|Horário/.test(line)) {
-              hasBusinessPattern = true;
+              hasBusinessData = true;
             }
           }
           
-          // Só adicionar se parecer um negócio real
-          if (hasBusinessPattern && potentialName.length > 3) {
-            seenNames.add(potentialName);
-            items.push({
-              nome: potentialName.substring(0, 100),
-              endereco: endereco.substring(0, 100),
-              telefone: telefone.substring(0, 50),
-              avaliacoes: avaliacoes.substring(0, 100),
-              fonte: 'google_maps_search'
-            });
-            
-            console.log(`[page] ✓ Encontrado: ${potentialName}`);
+          // FILTRO 8: Precisa ter pelo menos 1 dado comercial válido
+          if (!hasBusinessData) return;
+          
+          // FILTRO 9: Se tem telefone, não pode ser duplicado por telefone
+          if (telefone) {
+            if (seenPhones.has(telefone)) {
+              console.log(`[page] Skip phone duplicate: ${telefone}`);
+              return;
+            }
+            seenPhones.add(telefone);
           }
+          
+          // ✓ PASSOU EM TODOS OS FILTROS
+          seenNames.add(potentialName);
+          items.push({
+            nome: potentialName.substring(0, 100),
+            endereco: endereco.substring(0, 150),
+            telefone: telefone.substring(0, 50),
+            avaliacoes: avaliacoes.substring(0, 100),
+            fonte: 'google_maps_search'
+          });
+          
+          console.log(`[page] ✓ ${potentialName}`);
         });
         
-        console.log(`[page] Extraídos ${items.length} resultados`);
+        console.log(`[page] Total de ${items.length} leads extraídos`);
         return items;
       });
 
