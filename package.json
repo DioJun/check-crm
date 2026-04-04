@@ -1,0 +1,63 @@
+{
+  "name": "check-crm",
+  "version": "2.0.0",
+  "description": "CRM Desktop - Google Maps Scraper",
+  "main": "electron/main.js",
+  "homepage": "./",
+  "scripts": {
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:electron": "npx wait-on http://localhost:5173 && electron .",
+    "dev:all": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\" \"npx wait-on http://localhost:5173 && electron .\"",
+    "build": "cd frontend && npm run build",
+    "build:electron": "electron-builder build --publish never",
+    "dist": "npm run build && npm run build:electron",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-is-dev": "^2.0.0",
+    "wait-on": "^9.0.4"
+  },
+  "build": {
+    "appId": "com.checkcrm.app",
+    "productName": "CheckCRM",
+    "files": [
+      "electron/**/*",
+      "backend/src/**/*",
+      "backend/prisma/**/*",
+      "backend/package.json",
+      "backend/.env.example",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        "portable"
+      ],
+      "certificateFile": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

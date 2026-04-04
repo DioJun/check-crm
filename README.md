@@ -1,156 +1,117 @@
-thing all right# TemplatesHub CRM
+# CheckCRM - Desktop
 
-Sistema completo de CRM focado em geração de leads e contato via WhatsApp para o negócio **TemplatesHub**.
+CRM Desktop com Google Maps Scraper para geração de leads.
 
-## 📋 Funcionalidades
+## Funcionalidades
 
-- **Dashboard** – Visão geral de leads: total, hoje, taxa de conversão, novos e breakdown por status
-- **Lista de Leads** – Tabela com filtros por status, cidade, serviço e nome; ações de editar, ver detalhes e abrir WhatsApp
-- **Pipeline (Kanban)** – Colunas Novo / Contatado / Interessado / Fechado com drag-and-drop
-- **Detalhe do Lead** – Histórico de interações (mensagem, ligação, anotação) e botão WhatsApp
-- **Importação em lote** – `POST /api/leads/import` remove duplicados por telefone e padroniza DDI +55
-- **Autenticação JWT** – Login com e-mail e senha, rotas protegidas
+- **Dashboard** - Visão geral: total de leads, por status, taxa de conversão
+- **Lista de Leads** - Tabela com filtros por status, cidade, serviço e nome
+- **Pipeline (Kanban)** - Colunas Novo / Contatado / Interessado / Fechado com drag-and-drop
+- **Detalhe do Lead** - Histórico de interações e botão WhatsApp
+- **Google Maps Scraper** - Busca por termo (ex: "Eletricistas em Curitiba") e importa leads
+- **Importação em lote** - Upload de planilha ou importação via scraper
+- **Autenticação JWT** - Login com e-mail e senha
 
-## 🧱 Stack
+## Stack
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Frontend | React 18 + TailwindCSS 3 + Vite |
+| Desktop | Electron |
+| Frontend | React 19 + TailwindCSS + Vite |
 | Backend | Node.js + Express |
 | ORM | Prisma |
-| Banco de dados | PostgreSQL |
+| Banco de dados | SQLite (local) |
+| Scraper | Puppeteer |
 | Auth | JWT + bcryptjs |
-| Drag & Drop | @dnd-kit |
 
-## 🗂️ Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
 check-crm/
+├── package.json                  # Scripts root (dev, build, electron)
+├── electron/
+│   ├── main.js                   # Processo principal Electron
+│   ├── preload.js                # Bridge seguro (IPC)
+│   └── ipc-handlers.js           # Handlers IPC → Backend API
 ├── backend/
 │   ├── prisma/
-│   │   └── schema.prisma         # Schema do banco (Lead, Interacao, Usuario)
+│   │   └── schema.prisma         # Schema do banco (SQLite)
 │   ├── src/
-│   │   ├── controllers/          # Camada HTTP (auth, lead, interaction)
+│   │   ├── controllers/          # Camada HTTP
 │   │   ├── services/             # Regras de negócio
 │   │   ├── repositories/         # Acesso ao banco via Prisma
 │   │   ├── middleware/           # auth.middleware.js (JWT)
-│   │   ├── routes/               # Rotas Express
+│   │   ├── routes/               # Rotas Express + Scraper
+│   │   ├── lib/prisma.js         # Instância Prisma com path resolution
 │   │   └── app.js
-│   ├── .env.example
+│   ├── scripts/
+│   │   └── init-db.js            # Inicialização do banco SQLite
 │   └── package.json
 └── frontend/
     ├── src/
     │   ├── components/
     │   │   ├── Layout/           # Sidebar + Layout
     │   │   ├── Leads/            # LeadModal
+    │   │   ├── Scraper/          # GoogleMapsScraper
     │   │   └── ui/               # StatusBadge, WhatsAppButton
-    │   ├── context/              # AuthContext (useAuth hook)
-    │   ├── pages/                # Login, Dashboard, Leads, Pipeline, LeadDetail
-    │   ├── services/             # api.js (Axios + interceptors)
+    │   ├── context/              # AuthContext
+    │   ├── pages/                # Login, Dashboard, Leads, Pipeline, etc.
+    │   ├── services/api.js       # Wrapper axios/electronAPI
     │   └── App.jsx
     └── package.json
 ```
 
-## 🚀 Como Rodar Localmente
+## Como Rodar
 
 ### Pré-requisitos
 
 - Node.js >= 18
-- PostgreSQL rodando localmente (ou Supabase)
 - npm >= 9
 
-### 1. Backend
+### Instalação
 
 ```bash
+# Instalar dependências do root
+npm install
+
+# Instalar dependências do backend
 cd backend
+npm install --ignore-scripts
+npx prisma generate
+node scripts/init-db.js
+cd ..
 
-# Copie e configure as variáveis de ambiente
-cp .env.example .env
-# Edite .env com sua DATABASE_URL e JWT_SECRET
-
-# Instale dependências
+# Instalar dependências do frontend
+cd frontend
 npm install
-
-# Gere o Prisma Client e aplique o schema
-npm run db:generate
-npm run db:push      # ou npm run db:migrate (para migrations com histórico)
-
-# Inicie o servidor (desenvolvimento)
-npm run dev
-# Servidor disponível em http://localhost:3001
+cd ..
 ```
 
-### 2. Frontend
+### Desenvolvimento
 
 ```bash
-cd frontend
-
-# Instale dependências
-npm install
-
-# Inicie em modo desenvolvimento
+# Iniciar backend + frontend juntos
 npm run dev
-# App disponível em http://localhost:5173
 
-# Build para produção
-npm run build
+# Em outro terminal, iniciar Electron (opcional)
+npm run dev:electron
+
+# Ou iniciar tudo junto
+npm run dev:all
 ```
 
-### Variáveis de Ambiente
+O app fica disponível em:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3001
 
-**backend/.env**
-```env
-DATABASE_URL="postgresql://user:password@localhost:5432/templateshub_crm"
-JWT_SECRET="sua-chave-secreta-aqui"
-PORT=3001
+### Build Desktop
+
+```bash
+npm run dist
+# Gera instalador em dist/
 ```
 
-**frontend/.env** (opcional – padrão já configurado)
-```env
-VITE_API_URL=http://localhost:3001/api
-```
-
-## 🚀 Deploy no Vercel
-
-O projeto é composto por dois apps independentes. Cada um é implantado como um **projeto Vercel separado**.
-
-### Backend (API)
-
-1. Crie um projeto Vercel apontando para a pasta `backend/` do repositório
-   - **Root Directory**: `backend`
-   - **Build Command**: `npm run vercel-build` (executa `prisma generate` automaticamente)
-   - **Output Directory**: *(deixe em branco)*
-   - **Framework Preset**: Other
-
-2. Configure as **Environment Variables** no painel do Vercel:
-   | Variável | Valor |
-   |----------|-------|
-   | `DATABASE_URL` | URL de conexão PostgreSQL (ex: Supabase connection pooler) |
-   | `JWT_SECRET` | Chave secreta aleatória e longa |
-   | `CORS_ORIGIN` | URL do frontend (ex: `https://templateshub-crm.vercel.app`) |
-
-3. Após o deploy, copie a URL da API (ex: `https://templateshub-api.vercel.app`).
-
-> **Dica:** Use o Supabase como banco de dados — é gratuito e compatível com Vercel. Prefira a **connection string com pooling** (porta 6543) para evitar esgotamento de conexões em serverless.
-
-### Frontend
-
-1. Crie um segundo projeto Vercel apontando para a pasta `frontend/`
-   - **Root Directory**: `frontend`
-   - **Framework Preset**: Vite (detectado automaticamente)
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-
-2. Configure as **Environment Variables** no painel do Vercel:
-   | Variável | Valor |
-   |----------|-------|
-   | `VITE_API_URL` | URL da API do backend (ex: `https://templateshub-api.vercel.app/api`) |
-
-3. Após o deploy, atualize `CORS_ORIGIN` no projeto do backend com a URL do frontend e faça um re-deploy.
-
----
-
-
+## API Endpoints
 
 ### Autenticação
 | Método | Rota | Descrição |
@@ -158,12 +119,10 @@ O projeto é composto por dois apps independentes. Cada um é implantado como um
 | POST | `/api/auth/register` | Criar conta |
 | POST | `/api/auth/login` | Login (retorna JWT) |
 
-> Todas as rotas abaixo exigem `Authorization: Bearer <token>`
-
-### Leads
+### Leads (requer autenticação)
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/api/leads` | Listar leads (query: status, cidade, servico) |
+| GET | `/api/leads` | Listar leads |
 | GET | `/api/leads/stats` | Estatísticas do dashboard |
 | GET | `/api/leads/:id` | Buscar lead por ID |
 | POST | `/api/leads` | Criar lead |
@@ -171,32 +130,17 @@ O projeto é composto por dois apps independentes. Cada um é implantado como um
 | DELETE | `/api/leads/:id` | Deletar lead |
 | POST | `/api/leads/import` | Importar lista de leads |
 
-#### Exemplo de Importação
-```json
-POST /api/leads/import
-{
-  "leads": [
-    { "nome": "Maria Silva", "telefone": "11987654321", "cidade": "São Paulo", "servico": "Site" },
-    { "nome": "João Costa", "telefone": "21912345678", "cidade": "Rio de Janeiro", "servico": "Automação" }
-  ]
-}
-```
-Resposta: `{ "imported": 2, "skipped": 0, "total": 2 }`
+### Scraper (sem autenticação)
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| POST | `/api/scraper/search` | Busca por termo no Google Maps |
+| POST | `/api/scraper/google-maps` | Scrape de URL do Google Maps |
 
-### Interações
+### Interações (requer autenticação)
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/api/interactions/:leadId` | Listar interações do lead |
 | POST | `/api/interactions/:leadId` | Adicionar interação |
-
-#### Tipos de interação: `mensagem`, `ligacao`, `anotacao`
-
-## 📲 Integração WhatsApp
-
-O botão WhatsApp abre diretamente:
-```
-https://wa.me/55{telefone}?text=Oi%20{nome},%20tudo%20bem
-```
 
 A estrutura do backend está preparada para futura integração com **Z-API** ou **Evolution API** no serviço de leads.
 

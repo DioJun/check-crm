@@ -1,12 +1,15 @@
 const { PrismaClient } = require('@prisma/client');
+const path = require('path');
+
+// Garantir que o caminho do SQLite resolve corretamente independente do CWD
+const dbPath = path.resolve(__dirname, '../../dev.db');
+process.env.DATABASE_URL = `file:${dbPath}`;
 
 let prisma;
 
 if (process.env.NODE_ENV === 'production') {
-  // Production: create new instance each time (Vercel will pool)
   prisma = new PrismaClient();
 } else {
-  // Development: reuse instance
   if (!global.prisma) {
     global.prisma = new PrismaClient();
   }

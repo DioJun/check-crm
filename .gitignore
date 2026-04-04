@@ -10,6 +10,13 @@ dist/
 .env
 **/.env
 
+# Database
+*.db
+*.db-journal
+
+# Electron
+out/
+
 # Logs
 *.log
 npm-debug.log*
