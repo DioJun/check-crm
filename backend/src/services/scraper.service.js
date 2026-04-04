@@ -554,9 +554,10 @@ class ScraperService {
           for (let i = 1; i < lines.length; i++) {
             const line = lines[i];
             
-            // Telefone: (XX) XXXXX-XXXX
-            if (/\(\d{2,3}\)\s*\d{4,5}-\d{3,4}/.test(line)) {
-              telefone = line;
+            // Telefone: (XX) XXXXX-XXXX — extrair SÓ o padrão do telefone, não a linha toda
+            const phoneMatch = line.match(/\(\d{2,3}\)\s*\d{4,5}-\d{3,4}/);
+            if (phoneMatch && !telefone) {
+              telefone = phoneMatch[0];
               hasBusinessData = true;
             }
             

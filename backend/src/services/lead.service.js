@@ -67,11 +67,25 @@ async function getDashboardStats() {
 }
 
 function normalizeTelefone(telefone) {
-  const digits = telefone.replace(/\D/g, '');
-  if (!digits.startsWith('55')) {
-    return `+55${digits}`;
+  // Primeiro: extrair o padrão de telefone brasileiro da string (evita capturar horários etc.)
+  const phoneMatch = telefone.match(/\(?0?\d{2}\)?\s*\d{4,5}-?\d{4}/);
+  const cleanInput = phoneMatch ? phoneMatch[0] : telefone;
+
+  const digits = cleanInput.replace(/\D/g, '');
+
+  // Remover zero inicial do DDD (0XX)
+  const normalized = digits.startsWith('0') ? digits.slice(1) : digits;
+
+  // Telefone brasileiro válido: DDD(2) + número(8 ou 9) = 10 ou 11 dígitos
+  if (normalized.length < 10 || normalized.length > 11) {
+    // Se já começa com 55, pode ter 12 ou 13 dígitos
+    if (normalized.startsWith('55') && normalized.length >= 12 && normalized.length <= 13) {
+      return `+${normalized}`;
+    }
+    return ''; // Número inválido
   }
-  return `+${digits}`;
+
+  return `+55${normalized}`;
 }
 
 async function importLeads(leads) {
