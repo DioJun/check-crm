@@ -13,6 +13,7 @@ model Usuario {
   nome      String
   email     String   @unique
   senha     String
+  plan      String   @default("free")  // 'free', 'pro', 'enterprise'
   createdAt DateTime @default(now())
 }
 

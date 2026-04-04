@@ -27,15 +27,24 @@
     "wait-on": "^9.0.4"
   },
   "build": {
-    "appId": "com.checkcrm.app",
+    "appId": "com.checkmate.crm",
     "productName": "Checkmate CRM",
     "files": [
       "electron/**/*",
-      "backend/src/**/*",
-      "backend/prisma/**/*",
-      "backend/package.json",
-      "backend/.env.example",
+      "frontend/dist/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/",
+        "to": "assets/",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "backend/",
+        "to": "backend/",
+        "filter": ["src/**/*", "prisma/**/*", "node_modules/**/*", "package.json"]
+      }
     ],
     "directories": {
       "buildResources": "assets",
@@ -51,13 +60,17 @@
         },
         "portable"
       ],
-      "certificateFile": null
+      "icon": "assets/icon.png",
+      "signingHashAlgorithms": null,
+      "sign": null,
+      "forceCodeSigning": false
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    }
+    },
+    "asar": true
   }
 }

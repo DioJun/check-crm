@@ -606,6 +606,42 @@ class ScraperService {
         const seenNames = new Set();
         const seenPhones = new Set();
 
+        // Detectar se uma linha é review/avaliação de usuário (NÃO é endereço)
+        function isReviewText(line) {
+          // Texto entre aspas (reviews do Google Maps)
+          if (/^[""\u201C\u201D«»']/.test(line)) return true;
+          if (/[""\u201C\u201D«»']$/.test(line)) return true;
+          // Palavras comuns em reviews
+          if (/\b(nota\s+\d|recomendo|excelente|péssimo|ótimo|horrível|atendimento|profissional|gostei|amei|adorei|indico|voltarei|nunca\s+mais|muito\s+bom|muito\s+ruim|super\s+indico|maravilh|parabéns|melhor\s+|pior\s+)/i.test(line)) return true;
+          // Frases longas sem números de rua (provavelmente review)
+          if (line.length > 60 && !/\b\d{1,5}\b/.test(line)) return true;
+          return false;
+        }
+
+        // Detectar se uma linha é endereço
+        function isAddressLine(line) {
+          if (line.length < 5 || line.length > 150) return false;
+          if (isReviewText(line)) return false;
+          // Tem prefixo de logradouro
+          if (/\b(Rua|Av\.|Avenida|Praça|Travessa|Trav\.|Rod\.|Rodovia|Estrada|Estr\.|Alameda|Al\.|R\.|Pç\.|Largo|Via|BR-|SC-|PR-|SP-|RJ-|MG-)\b/i.test(line)) return true;
+          // Tem CEP
+          if (/\b\d{5}-?\d{3}\b/.test(line)) return true;
+          // Tem padrão "cidade - estado" ou "bairro, cidade"
+          if (/\b[A-Z][a-záàãéêíóôõúç]+\s*[-–]\s*[A-Z]{2}\b/.test(line)) return true;
+          // Tem número de endereço + vírgula (ex: "1234, Bairro" ou "Rua X, 123")
+          if (/\d{1,5}\s*,/.test(line) && !line.includes('·') && !line.includes('(')) return true;
+          // Número + hífen ou texto curto com vírgula e número (padrão endereço)
+          if (/,\s*\d{1,5}/.test(line) && line.length < 80 && !line.includes('(')) return true;
+          return false;
+        }
+
+        // Detectar se é info de categoria/serviço (ex: "Loja de eletrônicos · Centro")
+        function isCategoryLine(line) {
+          if (line.includes('·')) return true;
+          if (/^(Loja|Serviço|Restaurante|Hotel|Oficina|Consultório|Clínica|Escritório|Agência|Escola|Academia)\b/i.test(line)) return true;
+          return false;
+        }
+
         // SELETOR PRIMÁRIO: cada resultado é um <a> com class "hfpxzc" e aria-label
         const resultLinks = document.querySelectorAll('a.hfpxzc');
 
@@ -626,8 +662,12 @@ class ScraperService {
             let endereco = '';
             let telefone = '';
             let avaliacoes = '';
+            let categoria = '';
 
             for (const line of lines) {
+              // Pular o próprio nome do negócio
+              if (line === nome) continue;
+
               // Telefone
               if (!telefone) {
                 const pm = line.match(/\(?\d{2,3}\)?\s*\d{4,5}[\s.-]?\d{4}/);
@@ -638,12 +678,27 @@ class ScraperService {
                 avaliacoes = line;
                 continue;
               }
-              // Endereço
-              if (!endereco && line.length > 10 && (
-                /\b(Rua|Av\.|Avenida|Praça|Travessa|Trav\.|Rod\.|Estrada|R\.)\b/i.test(line) ||
-                /\b\d{5}-?\d{3}\b/.test(line) ||
-                (line.includes(',') && /\d/.test(line) && !line.includes('·'))
-              )) {
+              // Categoria (ex: "Loja de eletrônicos · Centro")
+              if (!categoria && isCategoryLine(line)) {
+                // Extrair endereço parcial se a categoria tiver " · Endereço"
+                const parts = line.split('·').map(p => p.trim());
+                if (parts.length >= 2) {
+                  categoria = parts[0];
+                  // O segundo fragmento pode ser bairro/zona
+                  const rest = parts.slice(1).join(', ').trim();
+                  if (rest && !endereco && rest.length > 3 && /[A-Za-záàãéêíóôõúç]/.test(rest)) {
+                    endereco = rest;
+                  }
+                } else {
+                  categoria = line;
+                }
+                continue;
+              }
+              // Endereço — só aceitar se passar na heurística
+              if (!endereco && isAddressLine(line)) {
+                endereco = line;
+              } else if (endereco && !endereco.includes(',') && isAddressLine(line) && line.length > endereco.length) {
+                // Se já tem endereço curto (só bairro), substituir por um mais completo
                 endereco = line;
               }
             }
@@ -692,9 +747,10 @@ class ScraperService {
             let endereco = '', telefone = '', avaliacoes = '', hasData = false;
             for (let i = 1; i < lines.length; i++) {
               const line = lines[i];
+              if (isReviewText(line)) continue;
               const pm = line.match(/\(?\d{2,3}\)?\s*\d{4,5}[\s.-]?\d{4}/);
               if (pm && !telefone) { telefone = pm[0]; hasData = true; }
-              if (!endereco && /\d+/.test(line) && line.length > 8 && /\b(Rua|Av\.|Avenida|Praça|Travessa|R\.)\b/i.test(line)) { endereco = line; hasData = true; }
+              if (!endereco && isAddressLine(line)) { endereco = line; hasData = true; }
               if (/⭐|★|\d+[.,]\d+\s*\(|\bAberto\b|\bFechado\b/.test(line)) { avaliacoes = line; hasData = true; }
             }
             if (!hasData) return;

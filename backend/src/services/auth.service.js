@@ -1,12 +1,19 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
+const LicenseService = require('./license.service');
 
-function generateToken(user) {
-  return jwt.sign(
-    { id: user.id, email: user.email, nome: user.nome },
+/**
+ * Gerar token JWT com informações de licença
+ * Em produção, o plano vem do banco da SaaS remota
+ * Em dev, usa plano padrão baseado no usuário local
+ */
+function generateToken(user, plan = 'free') {
+  return LicenseService.generateToken(
+    user,
+    plan,
     process.env.JWT_SECRET,
-    { expiresIn: '7d' }
+    '30d'
   );
 }
 
@@ -20,11 +27,25 @@ async function register(nome, email, senha) {
 
   const hashedSenha = await bcrypt.hash(senha, 10);
   const user = await prisma.usuario.create({
-    data: { nome, email, senha: hashedSenha },
+    data: { 
+      nome, 
+      email, 
+      senha: hashedSenha,
+      // Em produção SaaS, esses dados viriam do servidor remoto
+      plan: 'free'
+    },
   });
 
-  const token = generateToken(user);
-  return { token, user: { id: user.id, nome: user.nome, email: user.email } };
+  const token = generateToken(user, user.plan || 'free');
+  return { 
+    token, 
+    user: { 
+      id: user.id, 
+      nome: user.nome, 
+      email: user.email,
+      plan: user.plan || 'free'
+    } 
+  };
 }
 
 async function login(email, senha) {
@@ -42,8 +63,16 @@ async function login(email, senha) {
     throw err;
   }
 
-  const token = generateToken(user);
-  return { token, user: { id: user.id, nome: user.nome, email: user.email } };
+  const token = generateToken(user, user.plan || 'free');
+  return { 
+    token, 
+    user: { 
+      id: user.id, 
+      nome: user.nome, 
+      email: user.email,
+      plan: user.plan || 'free'
+    } 
+  };
 }
 
 module.exports = { register, login };

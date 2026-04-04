@@ -1,12 +1,19 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, fork } = require('child_process');
+const fs = require('fs');
 
 // Detectar ambiente de desenvolvimento
 const isDev = !app.isPackaged;
 
 let mainWindow;
 let backendProcess;
+
+// Em produção, backend fica em extraResources (fora do asar)
+function getBackendPath() {
+  if (isDev) return path.join(__dirname, '..', 'backend');
+  return path.join(process.resourcesPath, 'backend');
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -25,13 +32,15 @@ function createWindow() {
   });
 
   // Em desenvolvimento: carregar localhost React
-  // Em produção: carregar build estático
-  const startUrl = isDev 
-    ? 'http://localhost:5173'
-    : `file://${path.join(__dirname, '../frontend/dist/index.html')}`;
-  
-  console.log(`Loading URL: ${startUrl}`);
-  mainWindow.loadURL(startUrl);
+  // Em produção: carregar build estático (loadFile resolve asar automaticamente)
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173');
+  } else {
+    // __dirname em prod = resources/app.asar/electron/, logo ../frontend/dist/ resolve dentro do asar
+    const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
+    console.log(`Loading file: ${indexPath}`);
+    mainWindow.loadFile(indexPath);
+  }
   
   if (isDev) {
     mainWindow.webContents.openDevTools();
@@ -42,36 +51,92 @@ function createWindow() {
   });
 }
 
-// Iniciar backend Node.js (apenas se não estiver rodando separadamente)
+/**
+ * Garantir que o .env existe no backend (para produção).
+ * Se não existir, cria com valores padrão usando userData como DB path.
+ */
+function ensureBackendEnv() {
+  const backendDir = getBackendPath();
+  const envPath = path.join(backendDir, '.env');
+
+  if (!fs.existsSync(envPath)) {
+    // Em produção, colocar o DB no diretório de dados do usuário
+    const userDataPath = app.getPath('userData');
+    const dbPath = path.join(userDataPath, 'checkmate.db').replace(/\\/g, '/');
+
+    const envContent = [
+      `DATABASE_URL="file:${dbPath}"`,
+      `JWT_SECRET="${require('crypto').randomBytes(32).toString('hex')}"`,
+      `PORT=3001`,
+      `CORS_ORIGIN="http://localhost:5173,http://localhost:3001"`,
+    ].join('\n');
+
+    fs.writeFileSync(envPath, envContent, 'utf-8');
+    console.log(`[Prod] .env criado em ${envPath}`);
+    console.log(`[Prod] Database em: ${dbPath}`);
+  }
+}
+
+/** Verificar se backend já está rodando na porta 3001 */
+function checkBackendRunning() {
+  const http = require('http');
+  return new Promise((resolve) => {
+    const req = http.get('http://localhost:3001/health', (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(1500, () => { req.destroy(); resolve(false); });
+  });
+}
+
+/** Aguardar até o backend responder (polling) */
+async function waitForBackend(maxAttempts = 20) {
+  for (let i = 0; i < maxAttempts; i++) {
+    if (await checkBackendRunning()) {
+      console.log(`Backend respondendo (tentativa ${i + 1})`);
+      return true;
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return false;
+}
+
+// Iniciar backend Node.js
 async function startBackend() {
   // Verificar se o backend já está rodando
-  try {
-    const http = require('http');
-    await new Promise((resolve, reject) => {
-      const req = http.get('http://localhost:3001/health', (res) => {
-        if (res.statusCode === 200) {
-          console.log('Backend já está rodando na porta 3001');
-          resolve(true);
-        } else {
-          reject(new Error('Backend não respondeu corretamente'));
-        }
-      });
-      req.on('error', () => reject(new Error('Backend não encontrado')));
-      req.setTimeout(1000, () => { req.destroy(); reject(new Error('Timeout')); });
-    });
-    return; // Backend já rodando, não precisa spawnar
-  } catch (e) {
-    // Backend não está rodando, vamos iniciar
+  if (await checkBackendRunning()) {
+    console.log('Backend já está rodando na porta 3001');
+    return;
   }
 
-  console.log('Iniciando backend...');
-  const backendPath = path.join(__dirname, '../backend');
-  
-  backendProcess = spawn('npm', ['run', 'dev'], {
-    cwd: backendPath,
-    stdio: 'inherit',
-    shell: true,
-  });
+  ensureBackendEnv();
+
+  const backendDir = getBackendPath();
+  const backendEntry = path.join(backendDir, 'src', 'app.js');
+
+  if (isDev) {
+    // Dev: usar spawn com npm run dev (nodemon)
+    console.log('Iniciando backend (dev)...');
+    backendProcess = spawn('npm', ['run', 'dev'], {
+      cwd: backendDir,
+      stdio: 'inherit',
+      shell: true,
+    });
+  } else {
+    // Produção: fork direto do app.js (de app.asar.unpacked)
+    console.log(`Iniciando backend (prod): ${backendEntry}`);
+    backendProcess = fork(backendEntry, [], {
+      cwd: backendDir,
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+      },
+      stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+    });
+
+    backendProcess.stdout?.on('data', (d) => console.log(`[backend] ${d}`));
+    backendProcess.stderr?.on('data', (d) => console.error(`[backend] ${d}`));
+  }
 
   backendProcess.on('error', (err) => {
     console.error('Erro ao iniciar backend:', err);
@@ -79,10 +144,14 @@ async function startBackend() {
 
   backendProcess.on('exit', (code) => {
     console.log(`Backend saiu com código ${code}`);
+    backendProcess = null;
   });
 
-  // Aguardar backend iniciar
-  await new Promise(resolve => setTimeout(resolve, 3000));
+  // Aguardar backend ficar pronto
+  const ready = await waitForBackend();
+  if (!ready) {
+    console.error('Backend não respondeu após 10s. Continuando mesmo assim...');
+  }
 }
 
 app.on('ready', async () => {
@@ -98,10 +167,14 @@ app.on('ready', async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    if (backendProcess) {
-      backendProcess.kill();
-    }
     app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  if (backendProcess) {
+    backendProcess.kill();
+    backendProcess = null;
   }
 });
 
