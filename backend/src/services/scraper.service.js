@@ -339,95 +339,99 @@ class ScraperService {
       const results = await page.evaluate(() => {
         const items = [];
         
-        // Estratégia otimizada para Google Maps
-        // Os resultados estão organizados em divs com classe/atributos específicos
+        // Google Maps coloca os nomes dos negócios em estrutura específica
+        // Normalmente temos: ícone + nome + endereço + avaliação em um container
         
-        // Procurar pela lista de resultados (normalmente em [role="listbox"] ou similar)
-        const listbox = document.querySelector('[role="listbox"]');
-        let searchResults = [];
+        // Procurar por divs que têm a estrutura típica de um resultado:
+        // - Contêm texto com endereço (rua, número, bairro)
+        // - Podem ter avaliação com ⭐
+        // - Têm múltiplas linhas de texto
         
-        if (listbox) {
-          // Pegar todos os divs que são diretos filhos e parecem ser items
-          searchResults = Array.from(listbox.querySelectorAll('div > div'))
-            .filter((div, idx) => idx > 0 && idx < 25); // Pular primeiro (é container)
-        }
+        const allDivs = Array.from(document.querySelectorAll('div'));
         
-        // Se listbox não funcionar, tentar seletores alternativos
-        if (searchResults.length === 0) {
-          searchResults = Array.from(document.querySelectorAll('div'))
-            .filter(div => {
-              const text = div.textContent || '';
-              const childCount = div.children.length;
-              // Resultados normalmente têm 2-3 children (ícone, nome, info)
-              return childCount >= 1 && text.length > 5 && text.length < 500 &&
-                     !text.includes('Classificação') &&
-                     !text.includes('Filtros') &&
-                     !text.includes('©') &&
-                     !text.includes('Mapa');
-            })
-            .slice(0, 30);
-        }
-        
-        console.log(`[page] Procurando em ${searchResults.length} elementos`);
-        
-        // Processar cada resultado
-        searchResults.forEach((result, idx) => {
+        allDivs.forEach(div => {
           if (items.length >= 20) return;
           
-          const fullText = (result.innerText || result.textContent || '').trim();
+          const text = (div.innerText || div.textContent || '').trim();
           
-          // Pular se for texto muito curto ou vazio
-          if (fullText.length < 3) return;
+          // Critérios para identificar um resultado válido
+          const hasGoogleMapsStructure = 
+            // Tem pelo menos 2 linhas (nome e endereço)
+            text.split('\n').length >= 2 &&
+            // Tem um comprimento razoável
+            text.length > 10 && text.length < 1000 &&
+            // NÃO é elemento de Menu/UI
+            !text.includes('Recolher') &&
+            !text.includes('Abrir à') &&
+            !text.includes('Classificação') &&
+            !text.includes('Filtro') &&
+            !text.includes('Resultado') &&
+            !text.includes('© Google') &&
+            !text.includes('Mapa') &&
+            !text.includes('Compartilhar') &&
+            !text.includes('Menu') &&
+            !text.includes('Central de ajuda') &&
+            !text.includes('Configurações');
           
-          // Limpar linhas
-          const lines = fullText
-            .split('\n')
+          if (!hasGoogleMapsStructure) return;
+          
+          // Dividir em linhas e limpar
+          let lines = text.split('\n')
             .map(l => l.trim())
-            .filter(l => 
-              l && 
-              l.length > 1 && 
-              !l.includes('Classificação') &&
-              !l.includes('filtros') &&
-              !l.includes('Resultados') &&
-              !l.includes('compartilhar') &&
-              !l.includes('Horas') &&
-              !l.includes('Arraste')
-            );
+            .filter(l => l && l.length > 1);
           
-          if (lines.length === 0) return;
+          // Remover linhas de ícones e símbolos
+          lines = lines.filter(l => 
+            !l.match(/^[⭐★🗺️📍🔍✉️📞🌐]+$/) &&
+            !l.includes('hr') &&
+            !l.match(/^\d+$/)
+          );
           
-          // Primeiro elemento é geralmente o nome
+          if (lines.length < 2) return;
+          
+          // Primeira linha é geralmente o nome
           const nome = lines[0];
           
-          // Pular se parecer um filtro/label
-          if (nome.toLowerCase().includes('filtro') || 
-              nome.toLowerCase().includes('resultado') ||
-              nome.toLowerCase().includes('classificação')) {
-            return;
+          // Descartar se for tão curto que provavelmente é ícone ou label
+          if (nome.length < 3) return;
+          
+          // Buscar por linha que parece ser endereço
+          // Endereços geralmente tem rua + número ou número + bairro
+          let endereco = '';
+          let avaliacoes = '';
+          
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+            // Se tem números e texto, é provavelmente endereço
+            if (/\d/.test(line) && line.length > 5) {
+              endereco = line;
+              break;
+            }
           }
           
-          // Endereço é normalmente a segunda linha
-          const endereco = lines.length > 1 ? lines[1] : '';
-          
-          // Avaliação pode estar em várias linhas
-          const avaliacoes = lines.find(l => 
+          // Procurar por avaliação
+          avaliacoes = lines.find(l => 
             l.includes('⭐') || 
-            l.includes('★') || 
-            /\d+,?\d*\s*\(\d+\)/.test(l)
+            l.includes('★') ||
+            /\d+,\d+\s*\(\d+\)/.test(l)
           ) || '';
           
-          // Validar que temos um nome válido
-          if (nome && nome.length > 2 && !nome.includes('Abrir') && !nome.includes('Fechar')) {
+          // Validação final: tem nome? Parece um negócio real?
+          if (nome && nome.length > 3 && 
+              !nome.includes('Abrir') && 
+              !nome.includes('Fechar') &&
+              !nome.toLowerCase().includes('menu')) {
+            
             items.push({
               nome: nome.substring(0, 100),
-              endereco: endereco.substring(0, 200) || 'Endereço não informado',
+              endereco: endereco || 'Endereço não informado',
               avaliacoes: avaliacoes.substring(0, 100),
               fonte: 'google_maps_search'
             });
           }
         });
         
-        console.log(`[page] Extraídos ${items.length} itens válidos de ${searchResults.length} elementos`);
+        console.log(`[page] Extraídos ${items.length} resultados válidos`);
         return items;
       });
 
