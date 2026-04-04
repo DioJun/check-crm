@@ -69,12 +69,6 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
       return;
     }
 
-    // Validar se é URL do Google Maps
-    if (!mapsUrl.includes('maps.google.com') && !mapsUrl.includes('google.com/maps')) {
-      setError('URL inválida. Use uma URL do Google Maps');
-      return;
-    }
-
     setLoading(true);
     setError('');
     setResults([]);
@@ -313,21 +307,24 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
               <ol className="space-y-2 text-sm text-blue-800">
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-blue-200 text-blue-900 text-xs font-bold rounded-full">1</span>
-                  <span>Acesse <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">maps.google.com</a></span>
+                  <span>Abra <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">maps.google.com</a> em nova aba</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-blue-200 text-blue-900 text-xs font-bold rounded-full">2</span>
-                  <span>Faça uma busca (ex: "mecânicos em joinville")</span>
+                  <span>Faça a busca (ex: "Eletricistas em Curitiba") ou clique num resultado</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-blue-200 text-blue-900 text-xs font-bold rounded-full">3</span>
-                  <span>Copie a URL da barra de endereços</span>
+                  <span><strong>Copie a URL inteira</strong> da barra de endereços (Ctrl+C na barra)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-blue-200 text-blue-900 text-xs font-bold rounded-full">4</span>
-                  <span>Cole no campo abaixo</span>
+                  <span>Cole no campo abaixo (Ctrl+V)</span>
                 </li>
               </ol>
+              <p className="text-xs text-blue-700 mt-3 bg-blue-100 p-2 rounded">
+                ✓ Exemplo de URL: <code className="text-blue-900">https://maps.google.com/maps/search/eletricistas</code>
+              </p>
             </div>
 
             {/* Campo para colar URL */}
@@ -343,7 +340,7 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
                     setMapsUrl(e.target.value);
                     setError('');
                   }}
-                  placeholder="Ex: https://maps.google.com/?q=..."
+                  placeholder="Colar aqui: https://maps.google.com/maps/search/..."
                   disabled={loading}
                   autoFocus
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50"

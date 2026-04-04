@@ -46,13 +46,19 @@ class ScraperService {
    */
   static isValidGoogleMapsUrl(url) {
     try {
-      const parsedUrl = new URL(url);
-      // Verifica se é domínio Google (qualquer extensão) e contém 'maps' e 'place'
-      return parsedUrl.hostname.includes('google') && 
-             parsedUrl.pathname.includes('maps') &&
-             parsedUrl.pathname.includes('place');
+      // Se for URL completa, validar
+      if (url.startsWith('http')) {
+        const parsedUrl = new URL(url);
+        // Basta ter google e maps
+        return parsedUrl.hostname.includes('google') && parsedUrl.pathname.includes('maps');
+      }
+      
+      // Se parecer texto/parâmetro, aceitar também (pode ser search query)
+      // Basta ter alguns caracteres (mínimo 3)
+      return url.trim().length >= 3;
     } catch {
-      return false;
+      // Se falhar parse de URL, aceitar se tiver texto
+      return url.trim().length >= 3;
     }
   }
 
@@ -60,16 +66,42 @@ class ScraperService {
    * Extrai dados da URL do Google Maps usando estratégia alternativa
    */
   static async extractDataFromUrl(url) {
-    // Estratégia 1: Tentar extrair dados da URL encoded
-    const dataFromUrl = this.parseGoogleMapsUrl(url);
+    console.log('🔗 URL recebida:', url);
     
-    // Estratégia 2: Se forem coordenadas, buscar metadados
-    if (dataFromUrl.latitude && dataFromUrl.longitude) {
-      return await this.getBusinessDataByCoordinates(dataFromUrl);
+    // Se for apenas um parâmetro/código, é uma URL compartilhada
+    // Tentar reconstruir URL completa se necessário
+    let fullUrl = url;
+    if (!url.startsWith('http') && url.length > 0) {
+      // Pode ser um código compartilhado ou parte de URL
+      fullUrl = `https://maps.google.com/?q=${encodeURIComponent(url)}`;
+      console.log('🔗 URL reconstruída:', fullUrl);
     }
 
-    // Estratégia 3: Tentar requests HTTP (pode ter limitações)
-    return await this.scrapeWithHeadlessBrowser(url);
+    // Estratégia 1: Tentar extrair dados da URL encoded
+    const dataFromUrl = this.parseGoogleMapsUrl(fullUrl);
+    
+    // Estratégia 2: Se temos coordenadas, tentar usar
+    if (dataFromUrl.latitude && dataFromUrl.longitude) {
+      const result = await this.getBusinessDataByCoordinates(dataFromUrl);
+      if (result && result.nome) {
+        return [result];
+      }
+    }
+
+    // Estratégia 3: Tentar com Puppeteer se for URL válida
+    if (fullUrl.includes('google') && fullUrl.includes('maps')) {
+      try {
+        const results = await this.scrapeWithHeadlessBrowser(fullUrl);
+        if (results && results.length > 0) {
+          return results;
+        }
+      } catch (puppeteerError) {
+        console.error('⚠️ Puppeteer falhou:', puppeteerError.message);
+      }
+    }
+
+    // Se chegou aqui, nenhuma estratégia funcionou
+    throw new Error('Não foi possível extrair dados desta URL. Tente uma URL completa do Google Maps.');
   }
 
   /**
