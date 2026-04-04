@@ -63,15 +63,6 @@ try {
   console.error('❌ Scraper routes error:', err.message);
 }
 
-// Try loading license routes
-try {
-  const licenseRoutes = require('./routes/license.routes');
-  app.use('/api/license', licenseRoutes);
-  console.log('✅ License routes loaded at /api/license');
-} catch (err) {
-  console.error('❌ License routes error:', err.message);
-}
-
 // 404
 app.use((req, res) => {
   console.warn(`[404] ${req.method} ${req.originalUrl}`);

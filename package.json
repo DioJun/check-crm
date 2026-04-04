@@ -41,9 +41,16 @@
         "filter": ["**/*"]
       },
       {
-        "from": "backend/",
-        "to": "backend/",
-        "filter": ["src/**/*", "prisma/**/*", "node_modules/**/*", "package.json"]
+        "from": "backend/src",
+        "to": "backend/src"
+      },
+      {
+        "from": "backend/prisma",
+        "to": "backend/prisma"
+      },
+      {
+        "from": "backend/package.json",
+        "to": "backend/package.json"
       }
     ],
     "directories": {
@@ -51,15 +58,7 @@
       "output": "dist"
     },
     "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        "portable"
-      ],
+      "target": ["portable"],
       "icon": "assets/icon.png",
       "signingHashAlgorithms": null,
       "sign": null,
