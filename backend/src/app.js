@@ -4,8 +4,21 @@ const cors = require('cors');
 
 const app = express();
 
-// Middleware
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
+// Configurar CORS para múltiplos origins
+app.use(cors({
+  origin: function (origin, callback) {
+    const allowedOrigins = ['http://localhost:5173', 'https://check-crm-opf9.vercel.app', 'localhost'];
+    
+    // Se for desenvolvimento ou origin está na lista
+    if (!origin || allowedOrigins.includes(origin) || origin.includes('localhost')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 
 // Basic routes (test first)

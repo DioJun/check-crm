@@ -265,19 +265,8 @@ class ScraperService {
       return scrapCache.get(cacheKey);
     }
 
-    // Verificar se Puppeteer está disponível
     try {
-      require.resolve('puppeteer');
-    } catch (e) {
-      throw new Error(
-        '❌ Busca por termo não disponível neste ambiente (Puppeteer não instalado). ' +
-        '\n\n📝 Solução: Execute o CRM LOCALMENTE para usar busca por termo, ' +
-        'ou paste uma URL de um lugar específico do Google Maps.'
-      );
-    }
-
-    try {
-      console.log('🚀 Usando Puppeteer para buscar (LOCAL)...');
+      console.log('🚀 Usando Puppeteer para buscar...');
       const results = await this.searchWithPuppeteer(searchTerm);
 
       if (!results || results.length === 0) {
