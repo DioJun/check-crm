@@ -21,6 +21,9 @@ export function AuthProvider({ children }) {
     localStorage.setItem('crm_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    if (window.electronAPI) {
+      window.electronAPI.invoke('set-auth-token', newToken).catch(() => {});
+    }
     return response.data;
   }
 
@@ -31,6 +34,10 @@ export function AuthProvider({ children }) {
     localStorage.setItem('crm_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    // Sincronizar token com processo principal do Electron
+    if (window.electronAPI) {
+      window.electronAPI.invoke('set-auth-token', newToken).catch(() => {});
+    }
     return response.data;
   }
 
@@ -39,6 +46,10 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('crm_user');
     setToken(null);
     setUser(null);
+    // Limpar token no processo principal do Electron
+    if (window.electronAPI) {
+      window.electronAPI.invoke('set-auth-token', null).catch(() => {});
+    }
   }
 
   const isAuthenticated = Boolean(token);

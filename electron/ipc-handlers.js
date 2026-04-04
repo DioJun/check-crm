@@ -11,6 +11,17 @@ let headers = {
   'Content-Type': 'application/json',
 };
 
+// Sincronizar token de autenticação do renderer
+ipcMain.handle('set-auth-token', async (event, token) => {
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    console.log('[IPC] Token sincronizado do renderer');
+  } else {
+    delete headers['Authorization'];
+  }
+  return { success: true };
+});
+
 // ==================== AUTH ====================
 ipcMain.handle('user-login', async (event, { email, password }) => {
   try {
@@ -219,8 +230,8 @@ ipcMain.handle('import-leads', async (event, leads) => {
 ipcMain.handle('delete-multiple', async (event, ids) => {
   try {
     console.log(`[IPC] Deletando ${ids.length} leads`);
-    const response = await fetch(`${API_BASE_URL}/leads/delete-multiple`, {
-      method: 'POST',
+    const response = await fetch(`${API_BASE_URL}/leads`, {
+      method: 'DELETE',
       headers,
       body: JSON.stringify({ ids }),
     });

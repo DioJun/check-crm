@@ -43,7 +43,9 @@ export default function Leads() {
     setLoading(true);
     try {
       const res = await api.get('/leads');
-      setLeads(res.data?.leads || res.data || []);
+      const data = res.data;
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.leads) ? data.leads : []);
+      setLeads(list);
     } catch {
       setError('Erro ao carregar leads');
     } finally {

@@ -4,8 +4,8 @@ async function findAll(filters = {}) {
   const where = {};
 
   if (filters.status) where.status = filters.status;
-  if (filters.cidade) where.cidade = { contains: filters.cidade, mode: 'insensitive' };
-  if (filters.servico) where.servico = { contains: filters.servico, mode: 'insensitive' };
+  if (filters.cidade) where.cidade = { contains: filters.cidade };
+  if (filters.servico) where.servico = { contains: filters.servico };
 
   return prisma.lead.findMany({ where, orderBy: { dataEntrada: 'desc' } });
 }

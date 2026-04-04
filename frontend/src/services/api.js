@@ -3,6 +3,14 @@ import axios from 'axios';
 // Detectar se está rodando em Electron
 const isElectron = window.electronAPI !== undefined;
 
+// Sincronizar token IPC ao iniciar (se já logado via localStorage)
+if (isElectron) {
+  const savedToken = localStorage.getItem('crm_token');
+  if (savedToken) {
+    window.electronAPI.invoke('set-auth-token', savedToken).catch(() => {});
+  }
+}
+
 // Criar instância Axios como fallback
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
@@ -28,6 +36,28 @@ axiosInstance.interceptors.response.use(
   }
 );
 
+// Detectar 401 em respostas IPC e redirecionar para login
+function handleElectronError(error) {
+  const msg = error?.message || '';
+  if (msg.includes('401')) {
+    localStorage.removeItem('crm_token');
+    localStorage.removeItem('crm_user');
+    window.location.href = '/login';
+  }
+  return Promise.reject(error);
+}
+
+// Verificar se resposta IPC contém erro (handlers retornam { error } ao invés de throw)
+function checkIpcResult(result) {
+  if (result && result.error && typeof result.error === 'string' && result.error.includes('401')) {
+    localStorage.removeItem('crm_token');
+    localStorage.removeItem('crm_user');
+    window.location.href = '/login';
+    throw new Error(result.error);
+  }
+  return result;
+}
+
 // Wrapper que usa Electron IPC ou Axios
 const api = {
   // GET request
@@ -37,20 +67,24 @@ const api = {
       const endpoint = url.startsWith('/') ? url.slice(1) : url;
       try {
         const electronAPI = window.electronAPI;
+        let result;
         
         // Redirecionar para handlers específicos
         if (endpoint.startsWith('leads/stats')) {
-          const result = await electronAPI.getStats();
-          return { data: result };
-        } else if (endpoint.startsWith('leads')) {
-          const result = await electronAPI.getLeads(config.params || {});
-          return { data: result };
-        } else if (endpoint.startsWith('interactions')) {
-          const result = await electronAPI.invoke('get-interactions', endpoint.split('/')[1]);
-          return { data: result };
+          result = await electronAPI.getStats();
+        } else if (endpoint === 'leads' || endpoint === 'leads/') {
+          result = await electronAPI.getLeads(config.params || {});
+        } else if (endpoint.startsWith('leads/')) {
+          // leads/{id} - buscar lead individual
+          const leadId = endpoint.split('/')[1];
+          result = await electronAPI.getLead(leadId);
+        } else if (endpoint.startsWith('interactions/')) {
+          result = await electronAPI.invoke('get-interactions', endpoint.split('/')[1]);
         }
+        checkIpcResult(result);
+        return { data: result };
       } catch (error) {
-        return Promise.reject(error);
+        return handleElectronError(error);
       }
     }
     return axiosInstance.get(url, config);
@@ -97,10 +131,11 @@ const api = {
         } else if (endpoint.startsWith('interactions')) {
           const leadId = endpoint.split('/')[1];
           const result = await electronAPI.invoke('create-interaction', { leadId, ...data });
+          checkIpcResult(result);
           return { data: result };
         }
       } catch (error) {
-        return Promise.reject(error);
+        return handleElectronError(error);
       }
     }
     return axiosInstance.post(url, data, config);
@@ -116,10 +151,11 @@ const api = {
         
         if (endpoint.startsWith('leads')) {
           const result = await electronAPI.updateLead(leadId, data);
+          checkIpcResult(result);
           return { data: result };
         }
       } catch (error) {
-        return Promise.reject(error);
+        return handleElectronError(error);
       }
     }
     return axiosInstance.put(url, data, config);
@@ -138,7 +174,7 @@ const api = {
           return { data: { success: result } };
         }
       } catch (error) {
-        return Promise.reject(error);
+        return handleElectronError(error);
       }
     }
     return axiosInstance.delete(url, config);
