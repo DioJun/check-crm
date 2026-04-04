@@ -2,315 +2,187 @@ const { ipcMain } = require('electron');
 const fetch = require('node-fetch');
 const path = require('path');
 const fs = require('fs');
-const { app } = require('electron');
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
-// Headers padrão com suporte a autenticação
+// Headers padrao com suporte a autenticacao
 let headers = {
   'Content-Type': 'application/json',
 };
 
-// Sincronizar token de autenticação do renderer
+/**
+ * Helper: faz fetch na API backend com tratamento de erros consistente.
+ * SEMPRE throw em caso de erro - nunca retorna { error }.
+ */
+async function apiFetch(endpoint, options = {}) {
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}/${endpoint}`;
+  const method = options.method || 'GET';
+  console.log(`[IPC] ${method} ${url}`);
+
+  const response = await fetch(url, { headers, ...options });
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok) {
+    const msg = data.error || data.message || `Erro ${response.status}`;
+    console.error(`[IPC] Erro ${response.status}: ${msg}`);
+    const error = new Error(msg);
+    error.status = response.status;
+    throw error;
+  }
+
+  return data;
+}
+
+// ==================== TOKEN ====================
 ipcMain.handle('set-auth-token', async (event, token) => {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
-    console.log('[IPC] Token sincronizado do renderer');
+    console.log('[IPC] Token sincronizado');
   } else {
     delete headers['Authorization'];
+    console.log('[IPC] Token removido');
   }
   return { success: true };
 });
 
 // ==================== AUTH ====================
 ipcMain.handle('user-login', async (event, { email, password }) => {
-  try {
-    console.log(`[IPC] Login: ${email}`);
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ email, senha: password }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || data.message || 'Credenciais inválidas');
-    }
-    // Salvar token se sucesso
-    if (data.token) {
-      headers['Authorization'] = `Bearer ${data.token}`;
-    }
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao fazer login:', error.message);
-    throw error;
+  const data = await apiFetch('auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, senha: password }),
+  });
+  if (data.token) {
+    headers['Authorization'] = `Bearer ${data.token}`;
   }
+  return data;
 });
 
-ipcMain.handle('user-logout', async (event) => {
-  try {
-    console.log('[IPC] Logout');
-    delete headers['Authorization'];
-    return { success: true };
-  } catch (error) {
-    console.error('[IPC] Erro ao fazer logout:', error);
-    return { error: error.message };
-  }
+ipcMain.handle('user-logout', async () => {
+  delete headers['Authorization'];
+  console.log('[IPC] Logout');
+  return { success: true };
 });
 
 ipcMain.handle('auth-register', async (event, userData) => {
-  try {
-    console.log(`[IPC] Registrando usuário: ${userData.email}`);
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(userData),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || data.message || 'Erro ao registrar');
-    }
-    if (data.token) {
-      headers['Authorization'] = `Bearer ${data.token}`;
-    }
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao registrar:', error.message);
-    throw error;
+  const data = await apiFetch('auth/register', {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  });
+  if (data.token) {
+    headers['Authorization'] = `Bearer ${data.token}`;
   }
+  return data;
 });
 
 // ==================== SCRAPER ====================
 ipcMain.handle('search-leads', async (event, term) => {
-  try {
-    console.log(`[IPC] Buscando leads: ${term}`);
-    const response = await fetch(`${API_BASE_URL}/scraper/search`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ searchTerm: term }),
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao buscar leads:', error);
-    return { success: false, error: error.message, data: [] };
-  }
+  return apiFetch('scraper/search', {
+    method: 'POST',
+    body: JSON.stringify({ searchTerm: term }),
+  });
 });
 
 ipcMain.handle('scrape-url', async (event, url) => {
-  try {
-    console.log(`[IPC] Scrapeando URL: ${url}`);
-    const response = await fetch(`${API_BASE_URL}/scraper/google-maps`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ url }),
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao scraper URL:', error);
-    return { success: false, error: error.message };
-  }
+  return apiFetch('scraper/google-maps', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  });
 });
 
 // ==================== LEADS ====================
 ipcMain.handle('get-leads', async (event, filters = {}) => {
-  try {
-    console.log('[IPC] Buscando leads com filtros:', filters);
-    const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_BASE_URL}/leads?${params}`, {
-      method: 'GET',
-      headers,
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao buscar leads:', error);
-    return { error: error.message, data: [] };
-  }
+  const params = new URLSearchParams(filters);
+  return apiFetch(`leads?${params}`);
 });
 
 ipcMain.handle('get-lead', async (event, id) => {
-  try {
-    console.log(`[IPC] Buscando lead: ${id}`);
-    const response = await fetch(`${API_BASE_URL}/leads/${id}`, {
-      method: 'GET',
-      headers,
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao buscar lead:', error);
-    return { error: error.message };
-  }
+  return apiFetch(`leads/${id}`);
 });
 
 ipcMain.handle('create-lead', async (event, lead) => {
-  try {
-    console.log('[IPC] Criando lead:', lead.nome);
-    const response = await fetch(`${API_BASE_URL}/leads`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(lead),
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao criar lead:', error);
-    return { error: error.message };
-  }
+  return apiFetch('leads', {
+    method: 'POST',
+    body: JSON.stringify(lead),
+  });
 });
 
 ipcMain.handle('update-lead', async (event, { id, lead }) => {
-  try {
-    console.log(`[IPC] Atualizando lead: ${id}`);
-    const response = await fetch(`${API_BASE_URL}/leads/${id}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(lead),
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao atualizar lead:', error);
-    return { error: error.message };
-  }
+  return apiFetch(`leads/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(lead),
+  });
 });
 
 ipcMain.handle('delete-lead', async (event, id) => {
-  try {
-    console.log(`[IPC] Deletando lead: ${id}`);
-    const response = await fetch(`${API_BASE_URL}/leads/${id}`, {
-      method: 'DELETE',
-      headers,
-    });
-    return response.ok;
-  } catch (error) {
-    console.error('[IPC] Erro ao deletar lead:', error);
-    return false;
-  }
+  return apiFetch(`leads/${id}`, { method: 'DELETE' });
 });
 
 ipcMain.handle('import-leads', async (event, leads) => {
-  try {
-    console.log(`[IPC] Importando ${leads.length} leads`);
-    const response = await fetch(`${API_BASE_URL}/leads/import`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ leads }),
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao importar leads:', error);
-    return { error: error.message };
-  }
+  return apiFetch('leads/import', {
+    method: 'POST',
+    body: JSON.stringify({ leads }),
+  });
 });
 
 ipcMain.handle('delete-multiple', async (event, ids) => {
-  try {
-    console.log(`[IPC] Deletando ${ids.length} leads`);
-    const response = await fetch(`${API_BASE_URL}/leads`, {
-      method: 'DELETE',
-      headers,
-      body: JSON.stringify({ ids }),
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao deletar múltiplos leads:', error);
-    return { error: error.message };
-  }
+  return apiFetch('leads', {
+    method: 'DELETE',
+    body: JSON.stringify({ ids }),
+  });
+});
+
+// ==================== SPREADSHEET ====================
+ipcMain.handle('import-spreadsheet', async (event, payload) => {
+  return apiFetch('leads/import-spreadsheet', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+});
+
+ipcMain.handle('import-google-maps', async (event, payload) => {
+  return apiFetch('leads/import-google-maps', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+});
+
+ipcMain.handle('check-duplicates', async (event, payload) => {
+  return apiFetch('leads/check-duplicates', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 });
 
 // ==================== INTERACTIONS ====================
 ipcMain.handle('get-interactions', async (event, leadId) => {
-  try {
-    console.log(`[IPC] Buscando interações do lead: ${leadId}`);
-    const response = await fetch(`${API_BASE_URL}/interactions/${leadId}`, {
-      method: 'GET',
-      headers,
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao buscar interações:', error);
-    return { error: error.message, data: [] };
-  }
+  return apiFetch(`interactions/${leadId}`);
 });
 
 ipcMain.handle('create-interaction', async (event, interaction) => {
-  try {
-    console.log(`[IPC] Criando interação para lead: ${interaction.leadId}`);
-    const response = await fetch(`${API_BASE_URL}/interactions/${interaction.leadId}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(interaction),
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao criar interação:', error);
-    return { error: error.message };
-  }
+  return apiFetch(`interactions/${interaction.leadId}`, {
+    method: 'POST',
+    body: JSON.stringify(interaction),
+  });
 });
 
 // ==================== DASHBOARD ====================
-ipcMain.handle('get-stats', async (event) => {
-  try {
-    console.log('[IPC] Buscando estatísticas');
-    const response = await fetch(`${API_BASE_URL}/leads/stats`, {
-      method: 'GET',
-      headers,
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('[IPC] Erro ao buscar stats:', error);
-    return { error: error.message };
-  }
+ipcMain.handle('get-stats', async () => {
+  return apiFetch('leads/stats');
 });
 
 // ==================== SISTEMA ====================
-ipcMain.handle('get-version', async (event) => {
+ipcMain.handle('get-version', async () => {
   const version = require('../package.json').version;
   return { version };
 });
 
-ipcMain.handle('get-db-path', async (event) => {
+ipcMain.handle('get-db-path', async () => {
   const dbPath = path.join(__dirname, '../backend/dev.db');
   return { path: dbPath, exists: fs.existsSync(dbPath) };
 });
-

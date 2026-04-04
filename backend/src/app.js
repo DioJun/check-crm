@@ -64,11 +64,16 @@ try {
 }
 
 // 404
-app.use((req, res) => res.status(404).json({ error: 'not found' }));
+app.use((req, res) => {
+  console.warn(`[404] ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ error: 'Rota não encontrada' });
+});
 
 // Error handler
 app.use((err, req, res, next) => {
-  res.status(500).json({ error: err.message });
+  console.error(`[API Error] ${req.method} ${req.originalUrl}:`, err.message);
+  const status = err.status || 500;
+  res.status(status).json({ error: err.message });
 });
 
 if (require.main === module) {

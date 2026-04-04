@@ -20,6 +20,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importLeads: (leads) => ipcRenderer.invoke('import-leads', leads),
   deleteMultiple: (ids) => ipcRenderer.invoke('delete-multiple', ids),
   
+  // APIs de Spreadsheet
+  importSpreadsheet: (payload) => ipcRenderer.invoke('import-spreadsheet', payload),
+  importGoogleMaps: (payload) => ipcRenderer.invoke('import-google-maps', payload),
+  checkDuplicates: (payload) => ipcRenderer.invoke('check-duplicates', payload),
+  
   // APIs de Dashboard
   getStats: () => ipcRenderer.invoke('get-stats'),
   
