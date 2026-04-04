@@ -33,14 +33,15 @@ router.post('/validate-url', ScraperController.validateUrl.bind(ScraperControlle
  */
 router.post('/search', ScraperController.searchGoogleMaps.bind(ScraperController));
 
-// Rotas abaixo requerem autenticação
-router.use(authMiddleware);
-
 /**
  * POST /scraper/google-maps
- * Scrape de uma URL do Google Maps
+ * Scrape de uma URL do Google Maps (sem auth para fallback)
+ * Usada quando busca por termo falha
  */
 router.post('/google-maps', ScraperController.scrapeGoogleMaps.bind(ScraperController));
+
+// Rotas abaixo requerem autenticação
+router.use(authMiddleware);
 
 /**
  * POST /scraper/batch
