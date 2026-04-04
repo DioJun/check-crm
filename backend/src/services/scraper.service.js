@@ -322,15 +322,42 @@ class ScraperService {
         timeout: 60000 
       });
 
-      console.log('⏳ Aguardando resultados...');
-      await page.waitForTimeout(5000);
+      console.log('⏳ Aguardando renderização completa...');
+      // Aguardar mais tempo para elementos renderizarem
+      await new Promise(resolve => setTimeout(resolve, 8000));
+
+      // Tentar esperar por seletores específicos (com timeout)
+      try {
+        await page.waitForSelector('[role="option"]', { timeout: 5000 }).catch(() => {
+          console.log('⚠️ [role="option"] não encontrado dentro do timeout');
+        });
+      } catch (e) {
+        console.log('⚠️ Seletor [role="option"] não disponível');
+      }
 
       // Extrair resultados
       const results = await page.evaluate(() => {
         const items = [];
         
-        // Procurar por elementos de resultado
-        const searchResults = document.querySelectorAll('[role="option"]');
+        // Estratégia 1: Procurar por [role="option"]
+        let searchResults = document.querySelectorAll('[role="option"]');
+        console.log(`[page] Encontrados ${searchResults.length} com [role="option"]`);
+        
+        // Estratégia 2: Se não encontrou, procurar por outros seletores
+        if (searchResults.length === 0) {
+          searchResults = document.querySelectorAll('div[data-item-id]');
+          console.log(`[page] Tentativa 2 (data-item-id): ${searchResults.length}`);
+        }
+        
+        // Estratégia 3: Procurar por divs com texto relevante
+        if (searchResults.length === 0) {
+          const allDivs = document.querySelectorAll('div');
+          searchResults = Array.from(allDivs).filter(div => {
+            const text = div.innerText || '';
+            return text.length > 20 && text.includes('\n');
+          }).slice(0, 30);
+          console.log(`[page] Tentativa 3 (divs com texto): ${searchResults.length}`);
+        }
         
         searchResults.forEach((result, index) => {
           if (index < 20) {
@@ -338,12 +365,14 @@ class ScraperService {
             if (text && text.length > 5) {
               const lines = text.split('\n').filter(l => l.trim());
               
-              items.push({
-                nome: lines[0] || 'Sem nome',
-                endereco: lines[1] || lines[2] || 'Endereço não disponível',
-                avaliacoes: lines.find(l => l.includes('⭐') || l.includes('★')) || '',
-                fonte: 'google_maps_search'
-              });
+              if (lines.length > 0) {
+                items.push({
+                  nome: lines[0] || 'Sem nome',
+                  endereco: lines[1] || lines[2] || 'Endereço não disponível',
+                  avaliacoes: lines.find(l => l.includes('⭐') || l.includes('★') || l.includes('(')) || '',
+                  fonte: 'google_maps_search'
+                });
+              }
             }
           }
         });

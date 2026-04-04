@@ -174,24 +174,13 @@ class ScraperController {
         });
       } catch (error) {
         console.error('❌ Erro ao buscar:', error.message);
+        console.error('Stack:', error.stack);
         
-        // Se falhar, oferecer alternativa
-        return res.status(503).json({
+        // Retornar 500 com erro real para debugging
+        return res.status(500).json({
           success: false,
-          error: 'Busca por termo temporariamente indisponível',
-          message: 'A busca automática por termo não está funcionando no momento (limitação do Vercel).',
-          alternative: {
-            type: 'URL_SCRAPER',
-            instruction: 'Você pode usar a busca por URL ao invés:',
-            steps: [
-              '1. Acesse Google Maps (maps.google.com)',
-              '2. Faça uma busca pelo termo (ex: "mecânicos em joinville")',
-              '3. Clique em um resultado para abrir a página',
-              '4. Copie a URL da barra de endereços',
-              '5. Cole a URL no campo de busca do CRM'
-            ]
-          },
-          tip: 'URLs do Google Maps (maps.google.com/?q=...) funcionam perfeitamente!'
+          error: error.message,
+          tip: 'Verifique os logs do backend para mais detalhes'
         });
       }
 
