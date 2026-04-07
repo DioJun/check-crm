@@ -76,27 +76,54 @@ function ensureBackendEnv() {
   const backendDir = getBackendPath();
   const envPath = path.join(backendDir, '.env');
 
+  console.log('[Env] ============================================');
+  console.log('[Env] Backend dir:', backendDir);
+  console.log('[Env] Env file path:', envPath);
+
   if (!fs.existsSync(envPath)) {
     // Em produção, colocar o DB no diretório de dados do usuário
     const userDataPath = app.getPath('userData');
-    const dbPath = path.join(userDataPath, 'checkmate.db').replace(/\\/g, '/');
+    const dbFile = path.join(userDataPath, 'checkmate.db');
+    
+    // SQLite URL format: file:///C:/path/to/file.db (3 slashes para absolute path no Windows)
+    // ou file:/C:/path/to/file.db (1 slash, Prisma interpreta corretamente)
+    let databaseUrl;
+    if (process.platform === 'win32') {
+      // Windows: file:/C:/Users/.../checkmate.db
+      databaseUrl = `file:${dbFile.replace(/\\/g, '/')}`;
+    } else {
+      // Unix: file:///home/.../checkmate.db
+      databaseUrl = `file:${dbFile}`;
+    }
     
     // Generate JWT_SECRET once and persist it
     const jwtSecret = require('crypto').randomBytes(32).toString('hex');
 
     const envContent = [
-      `DATABASE_URL="file:${dbPath}"`,
+      `DATABASE_URL="${databaseUrl}"`,
       `JWT_SECRET="${jwtSecret}"`,
       `PORT=3001`,
       `CORS_ORIGIN="http://localhost:5173,http://localhost:3001"`,
     ].join('\n');
 
     fs.writeFileSync(envPath, envContent, 'utf-8');
-    console.log(`[Backend] .env criado em ${envPath}`);
-    console.log(`[Backend] Database em: ${dbPath}`);
+    console.log('[Env] ✓ .env criado em:', envPath);
+    console.log('[Env] ✓ DATABASE_URL:', databaseUrl);
+    console.log('[Env] ✓ Database file:', dbFile);
+    console.log('[Env] Verificando arquivo criado...');
+    const created = fs.existsSync(envPath);
+    console.log('[Env] Arquivo .env existe?', created);
+    if (created) {
+      const content = fs.readFileSync(envPath, 'utf-8');
+      console.log('[Env] Conteúdo (primeiras linhas):', content.split('\n')[0]);
+    }
   } else {
-    console.log('[Backend] .env já existe, usando valores persistidos');
+    console.log('[Env] .env já existe, usando valores persistidos');
+    const content = fs.readFileSync(envPath, 'utf-8');
+    const databaseUrl = content.split('\n')[0];
+    console.log('[Env] DATABASE_URL:', databaseUrl);
   }
+  console.log('[Env] ============================================\n');
 }
 
 /** Verificar se backend já está rodando na porta 3001 */
@@ -192,47 +219,66 @@ async function ensureBackendDeps() {
 
 /** Run database migrations in production */
 async function runDatabaseMigrations() {
-  if (isDev) return true; // Skip in dev
+  if (isDev) {
+    console.log('[Database] DEV MODE - Pulando migrações');
+    return true;
+  }
   
   const backendDir = getBackendPath();
-  console.log('[Database] Executando migrações Prisma...');
+  console.log('[Database] ============================================');
+  console.log('[Database] Migrações do Banco de Dados');
+  console.log('[Database] Backend dir:', backendDir);
+  console.log('[Database] ============================================');
   
   return new Promise((resolve) => {
     const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-    const migrate = spawn(cmd, ['prisma', 'migrate', 'deploy', '--skip-generate'], {
+    
+    console.log('[Database] Executando: npx prisma migrate deploy');
+    const migrate = spawn(cmd, ['prisma', 'migrate', 'deploy'], {
       cwd: backendDir,
       stdio: 'pipe',
       shell: true,
+      env: process.env,
     });
 
-    let output = '';
+    let fullOutput = '';
+    let errorOutput = '';
+    
     if (migrate.stdout) {
       migrate.stdout.on('data', (data) => {
-        output += data.toString();
-        const msg = data.toString().trim();
-        if (msg && msg.includes('migrations')) console.log('[Database]', msg);
+        const msg = data.toString();
+        fullOutput += msg;
+        console.log('[Prisma]', msg.trim());
       });
     }
+    
     if (migrate.stderr) {
       migrate.stderr.on('data', (data) => {
-        output += data.toString();
-        const msg = data.toString().trim();
-        if (msg) console.error('[Database]', msg);
+        const msg = data.toString();
+        errorOutput += msg;
+        console.error('[Prisma ERR]', msg.trim());
       });
     }
 
     migrate.on('close', (code) => {
-      if (code === 0) {
+      console.log('[Database] Process exited with code:', code);
+      
+      if (code === 0 || code === null) {
         console.log('[Database] ✓ Migrações aplicadas com sucesso');
+        console.log('[Database] ============================================\n');
         resolve(true);
       } else {
-        console.warn('[Database] ⚠️ Aviso na migração (código ' + code + '), continuando...');
-        resolve(true); // Continue mesmo com warning
+        console.error('[Database] ✗ Erro na migração (código ' + code + ')');
+        console.error('[Database] STDOUT:', fullOutput);
+        console.error('[Database] STDERR:', errorOutput);
+        console.log('[Database] ============================================\n');
+        resolve(false);
       }
     });
 
     migrate.on('error', (err) => {
-      console.error('[Database] Erro ao executar migração:', err.message);
+      console.error('[Database] Erro ao executar spawn:', err.message);
+      console.log('[Database] ============================================\n');
       resolve(false);
     });
   });
@@ -274,6 +320,10 @@ async function startBackend() {
     return;
   }
 
+  console.log('[Backend] ============================================');
+  console.log('[Backend] Iniciando sequência de startup...');
+  
+  console.log('[Backend] STEP 1: Configurando variáveis de ambiente...');
   ensureBackendEnv();
 
   const backendDir = getBackendPath();
@@ -281,23 +331,23 @@ async function startBackend() {
 
   // Em produção, garantir que as dependências estão instaladas
   if (!isDev) {
-    console.log('[Backend] Iniciando check de dependências...');
+    console.log('[Backend] STEP 2: Verificando dependências...');
     const depSuccess = await ensureBackendDeps();
     if (!depSuccess) {
       console.warn('[Backend] ⚠️ npm install retornou erro, tentando mesmo assim...');
     }
     
     // Run database migrations
-    console.log('[Backend] Preparando banco de dados...');
+    console.log('[Backend] STEP 3: Executando migrações do banco de dados...');
     const migSuccess = await runDatabaseMigrations();
     if (!migSuccess) {
-      console.warn('[Backend] ⚠️ Migração retornou erro, tentando mesmo assim...');
+      console.warn('[Backend] ⚠️ Migração retornou erro, continuando...');
     }
   }
 
   if (isDev) {
     // Dev: usar spawn com npm run dev (nodemon)
-    console.log('[Backend] Iniciando backend (dev mode)...');
+    console.log('[Backend] STEP 4: Iniciando backend (dev mode)...');
     backendProcess = spawn('npm', ['run', 'dev'], {
       cwd: backendDir,
       stdio: 'inherit',
@@ -305,7 +355,11 @@ async function startBackend() {
     });
   } else {
     // Produção: fork direto do app.js
-    console.log(`[Backend] Iniciando backend (production mode): ${backendEntry}`);
+    console.log(`[Backend] STEP 4: Iniciando backend (production mode)...`);
+    console.log(`[Backend] Entry: ${backendEntry}`);
+    console.log(`[Backend] CWD: ${backendDir}`);
+    console.log(`[Backend] NODE_ENV: production`);
+    
     backendProcess = fork(backendEntry, [], {
       cwd: backendDir,
       env: {
@@ -336,12 +390,15 @@ async function startBackend() {
   });
 
   // Aguardar backend ficar pronto (importante: aguarde ANTES de criar window)
-  console.log('[Backend] Aguardando backend responder...');
+  console.log('[Backend] STEP 5: Aguardando backend responder...');
   const ready = await waitForBackend();
   if (!ready) {
     console.warn('[Backend] ⚠️ Backend não respondeu após 30s. Continuando mesmo assim...');
     console.warn('[Backend] Verifique se há erros acima. Pode precisar instalar Node.js.');
   } else {
+    console.log('[Backend] ✓ Backend respondendo normalmente');
+  }
+  console.log('[Backend] ============================================\n');
     console.log('[Backend] ✅ Backend online e pronto!');
   }
 }
