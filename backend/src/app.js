@@ -43,8 +43,10 @@ app.get('/', (req, res) => {
 try {
   const authRoutes = require('./routes/auth.routes');
   app.use('/api/auth', authRoutes);
+  console.log('✅ Auth routes loaded at /api/auth');
 } catch (err) {
-  console.error('Auth routes error:', err.message);
+  console.error('❌ Auth routes error:', err.message);
+  console.error(err.stack);
 }
 
 // Try loading lead routes
