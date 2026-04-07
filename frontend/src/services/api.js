@@ -98,11 +98,25 @@ const api = {
 
         // Auth
         if (endpoint === 'auth/login' || endpoint.startsWith('auth/login')) {
-          const result = await ea.login(data.email, data.senha);
+          // Add timeout to prevent hanging
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Login timeout - servidor não respondeu em 15s')), 15000)
+          );
+          const result = await Promise.race([
+            ea.login(data.email, data.senha),
+            timeoutPromise
+          ]);
           return { data: result };
         }
         if (endpoint === 'auth/register' || endpoint.startsWith('auth/register')) {
-          const result = await ea.invoke('auth-register', data);
+          // Add timeout to prevent hanging
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Register timeout - servidor não respondeu em 15s')), 15000)
+          );
+          const result = await Promise.race([
+            ea.invoke('auth-register', data),
+            timeoutPromise
+          ]);
           return { data: result };
         }
 

@@ -1,7 +1,9 @@
 {
-  "name": "check-crm",
+  "name": "checkmate-crm",
   "version": "2.0.0",
   "description": "Checkmate CRM - Gestão de Leads com Google Maps Scraper",
+  "author": "Checkmate CRM",
+  "license": "MIT",
   "main": "electron/main.js",
   "homepage": "./",
   "scripts": {
@@ -51,6 +53,10 @@
       {
         "from": "backend/package.json",
         "to": "backend/package.json"
+      },
+      {
+        "from": "backend/package-lock.json",
+        "to": "backend/package-lock.json"
       }
     ],
     "directories": {
@@ -60,9 +66,13 @@
     "win": {
       "target": ["portable"],
       "icon": "assets/icon.png",
+      "certificateFile": null,
+      "certificatePassword": null,
       "signingHashAlgorithms": null,
       "sign": null,
-      "forceCodeSigning": false
+      "forceCodeSigning": false,
+      "legalTrademarks": "Checkmate CRM",
+      "artifactName": "${productName}-${version}.exe"
     },
     "nsis": {
       "oneClick": false,

@@ -21,7 +21,16 @@ app.use(cors({
 
 app.use(express.json());
 
-// Basic routes (test first)
+// Favicon (prevent 404 errors)
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).send();
+});
+
+app.get('/favicon.svg', (req, res) => {
+  res.status(204).send();
+});
+
+// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
@@ -77,7 +86,11 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
-  app.listen(process.env.PORT || 3001);
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`✅ [Server] Listening on http://localhost:${PORT}`);
+    console.log(`✅ [Server] API ready at http://localhost:${PORT}/api`);
+  });
 }
 
 module.exports = app;
