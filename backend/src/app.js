@@ -7,12 +7,25 @@ const app = express();
 // Configurar CORS para múltiplos origins
 app.use(cors({
   origin: function (origin, callback) {
-    const allowedOrigins = ['http://localhost:5173', 'https://check-crm-opf9.vercel.app', 'localhost'];
+    // Em produção, usar ENV variable (CORS_ORIGIN)
+    const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'localhost',
+      'http://localhost',
+      corsOrigin,
+      // Aceitar qualquer vercel.app para desenvolvimento
+      ...(process.env.NODE_ENV === 'development' ? ['*.vercel.app'] : [])
+    ].filter(Boolean);
     
     // Se for desenvolvimento ou origin está na lista
-    if (!origin || allowedOrigins.includes(origin) || origin.includes('localhost')) {
+    if (!origin || allowedOrigins.includes(origin) || 
+        origin.includes('localhost') || 
+        origin.includes('vercel.app')) {
       callback(null, true);
     } else {
+      console.warn('[CORS] Bloqueado:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
