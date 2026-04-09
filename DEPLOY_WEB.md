@@ -2,168 +2,302 @@
 
 ## Visão Geral
 Aplicação web com:
-- **Backend**: Express.js + Prisma + SQLite (Vercel Serverless)
-- **Frontend**: React + Vite + HashRouter (Vercel Static)
-- **Database**: PostgreSQL (recomendado) ou SQLite com backup
+- **Backend**: Express.js + Prisma + PostgreSQL (Supabase)
+- **Frontend**: React + Vite + HashRouter (Vercel)
+- **Database**: PostgreSQL (Supabase - gratuito 500MB)
 - **Auth**: JWT
+- **Hosting**: Vercel (gratuito)
 
-## Pré-requisitos
-1. Conta Vercel (vercel.com)
-2. GitHub com repo pushado
-3. Variáveis de ambiente configuradas
+## 🚀 Quick Start (5 minutos)
 
-## Step 1: Preparar Repositório
-
+### 1. Setup Supabase
 ```bash
-# Verificar status
-git status
-git log --oneline -5
-
-# Se precisar de commits
-git add -A
-git commit -m "chore: Prepare for web deployment"
-git push origin main
+# Vá para supabase.com
+# Create project > Copy CONNECTION STRING
+# Guarde a senha do DB
 ```
 
-## Step 2: Deploy Backend (Vercel)
+👉 **Guia completo**: `SUPABASE_SETUP.md`
 
-### Via CLI:
+### 2. Deploy Backend na Vercel
 ```bash
-npm i -g vercel
+cd backend
+vercel --prod
+# Add Environment Variables:
+# - DATABASE_URL (from Supabase)
+# - JWT_SECRET (random string)
+# - CORS_ORIGIN (seu frontend URL)
+```
 
-# Na pasta backend/
+### 3. Deploy Frontend
+```bash
+cd frontend
+vercel --prod
+# Add Environment Variable:
+# - VITE_API_URL (seu backend URL)
+```
+
+### 4. Pronto! ✅
+- Frontend: https://seu-frontend.vercel.app
+- Backend: https://seu-backend.vercel.app
+- Database: Supabase
+
+---
+
+## Pré-requisitos
+1. ✅ Conta Supabase (free tier)
+2. ✅ Conta Vercel (free tier)
+3. ✅ GitHub com repo pushado
+4. ✅ Node.js + npm
+
+## Step-by-Step Detalhado
+
+### Step 1: Setup Supabase
+
+**Login / Create Account**
+- [supabase.com](https://supabase.com)
+- Sign up with GitHub
+
+**Create Project**
+1. "New Project"
+2. Name: `checkmate-crm`
+3. Password: Salve em lugar seguro!
+4. Region: Escolha a mais próxima
+5. Create (aguarde 2-5 min)
+
+**Get Connection String**
+1. Settings > Database
+2. Connection pooling: `pgbouncer`
+3. Copy the connection string
+
+Exemplo:
+```
+postgresql://postgres.xxxxx:password@aws-x-xxxxx.pooler.supabase.com:6543/postgres
+```
+
+**Anote:**
+- Connection String
+- Database Password
+
+### Step 2: Deploy Backend (Vercel)
+
+**Via CLI:**
+```bash
+npm install -g vercel
 cd backend
 vercel --prod
 ```
 
-### Via Dashboard:
-1. Vá para vercel.com/dashboard
-2. "Import Project"
-3. Selecione GitHub repo
-4. Root Directory: `backend`
-5. Automatic Deployments: ✓ (padrão)
-6. Framework: `Other` (Node.js)
-7. Add Environment Variables:
-   - `DATABASE_URL`: "postgresql://..." (ou SQLite file)
-   - `JWT_SECRET`: random string (32+ chars)
-   - `NODE_ENV`: production
-   - `CORS_ORIGIN`: "https://seu-frontend.vercel.app"
+**Via Dashboard:**
+1. [vercel.com/dashboard](https://vercel.com/dashboard)
+2. "Add New Project"
+3. Import from Git > Select `check-crm`
+4. Framework: `Other`
+5. Root Directory: `backend`
+6. **Environment Variables**:
+   ```
+   DATABASE_URL = postgresql://postgres.xxxxx:password@...
+   JWT_SECRET = aSuperLongRandomString32CharsMinimum!
+   CORS_ORIGIN = https://seu-nome-frontend.vercel.app
+   NODE_ENV = production
+   ```
+7. Deploy
 
-Anote o URL: `https://seu-backend.vercel.app`
+**Anote o URL**: `https://seu-backend-xxxxx.vercel.app`
 
-## Step 3: Deploy Frontend (Vercel)
+### Step 3: Deploy Frontend (Vercel)
 
-### Via CLI:
+1. [vercel.com/dashboard](https://vercel.com/dashboard)
+2. "Add New Project"
+3. Import `check-crm`
+4. Framework: `Vite`
+5. Root Directory: `frontend`
+6. **Environment Variables**:
+   ```
+   VITE_API_URL = https://seu-backend-xxxxx.vercel.app/api
+   ```
+7. Deploy
+
+**Anote o URL**: `https://seu-frontend-xxxxx.vercel.app`
+
+### Step 4: Update Backend CORS
+
+Agora que tem o frontend URL final:
+
+1. Vercel Dashboard > Backend Project > Settings
+2. Environment Variables > `CORS_ORIGIN`
+3. Mude para o URL real do frontend
+4. Redeploy (automático)
+
+### Step 5: Run Migrations
+
+Backend precisa criar tabelas no Supabase.
+
+**Local Machine:**
 ```bash
-cd frontend
-vercel --prod
+export DATABASE_URL="postgresql://postgres.xxxxx:password@..."
+npx prisma migrate deploy
 ```
 
-### Via Dashboard:
-1. Add Environment Variables:
-   - `VITE_API_BASE_URL`: "https://seu-backend.vercel.app"
-2. Build Settings:
-   - Build Command: `npm run build`
-   - Output Directory: `dist`
-3. Deploy
-
-Anote o URL: `https://seu-frontend.vercel.app`
-
-## Step 4: Atualizar Backend CORS
-
-1. Vá para Vercel Dashboard > Backend Project
-2. Settings > Environment Variables
-3. Atualize `CORS_ORIGIN` com o URL do frontend
-4. Re-deploy (ou automático)
-
-## Step 5: Testar
-
-1. Abra frontend: https://seu-frontend.vercel.app
-2. Teste registro/login
-3. Verifique console (F12) para erros de API
-
-## Database Setup
-
-### Opção 1: PostgreSQL (Recomendado)
-```
-Use Vercel Postgres ou Neon/Supabase
-
-DATABASE_URL="postgresql://user:pass@host:5432/db"
+**Ou Vercel CLI:**
+```bash
+vercel env pull  # Pull .env from Vercel
+npx prisma migrate deploy
 ```
 
-### Opção 2: SQLite (Desenvolvimento)
-```
-DATABASE_URL="file:./prisma/dev.db"
-Backup manual necessário
-```
+### Step 6: Verificar
 
-## Variáveis de Ambiente Resumidas
+1. **Backend Health Check**:
+   ```bash
+   curl https://seu-backend.vercel.app/health
+   # Resposta: {"status":"ok"}
+   ```
 
-**Backend (vercel/backend/.env.production):**
+2. **Frontend**:
+   - Abra: https://seu-frontend.vercel.app
+   - Teste registro com email
+   - Verifique console (F12)
+
+3. **Database** (Supabase):
+   - SQL Editor > Execute:
+   ```sql
+   SELECT * FROM usuario LIMIT 1;
+   ```
+
+## Environment Variables
+
+### Backend (.env ou Vercel)
 ```
-DATABASE_URL=postgresql://...
-JWT_SECRET=seu_secret_muito_longo_aqui_pelo_menos_32_chars
+DATABASE_URL=postgresql://postgres.xxxxx:password@pooler.supabase.com:6543/postgres
+JWT_SECRET=aSuperLongRandomStringMin32CharsForSecurity!
+PORT=3000
 NODE_ENV=production
 CORS_ORIGIN=https://seu-frontend.vercel.app
-PORT=3000
 ```
 
-**Frontend (vercel/frontend/.env.production):**
+### Frontend (.env ou Vercel)
 ```
-VITE_API_BASE_URL=https://seu-backend.vercel.app
+VITE_API_URL=https://seu-backend.vercel.app/api
+```
+
+## Architecture
+
+```
+┌─────────────────────────────────────┐
+│  seu-frontend.vercel.app (React)    │
+│  ├─ src/pages/Login.jsx             │
+│  ├─ src/pages/Dashboard.jsx         │
+│  └─ src/services/api.js             │
+└────────────┬────────────────────────┘
+             │ fetch API
+             ↓
+┌─────────────────────────────────────┐
+│ seu-backend.vercel.app (Express)    │
+│ ├─ /api/auth/register               │
+│ ├─ /api/auth/login                  │
+│ ├─ /api/leads                       │
+│ └─ /api/interactions                │
+└────────────┬────────────────────────┘
+             │ SQL
+             ↓
+┌─────────────────────────────────────┐
+│  Supabase PostgreSQL (Free)         │
+│  ├─ usuario (account)               │
+│  ├─ lead (contacts)                 │
+│  └─ interacao (interactions)        │
+└─────────────────────────────────────┘
 ```
 
 ## Troubleshooting
 
 ### CORS Error
+```
+Access to XMLHttpRequest blocked by CORS policy
+```
+**Fix:**
 - Verifique `CORS_ORIGIN` no backend
-- Tab Network vê erro 401 ou 403?
+- Redeploy após mudar
+- Clear cache do browser
 
-### 404 Page Not Found
-- Frontend usa HashRouter (#) por isso funciona no file://
-- Vercel já tem rewrite para /index.html configurado
-
-### Database Connection
-- Teste URL localmente: `npx prisma db push`
-- Verifique variáveis no Vercel Dashboard
-
-### Prisma Migration
-- Não execute manualmente na Vercel
-- Prisma migrate deploy roda automaticamente quando declarado
-
-## URLs Esperadas
-
+### 401 Unauthorized
 ```
-Frontend:  https://seu-nome.vercel.app
-Backend:   https://seu-nome-api.vercel.app ou mesmo projeto
-API Routes:
-  POST   /api/auth/register
-  POST   /api/auth/login
-  GET    /api/auth/me
-  GET    /api/leads
-  POST   /api/leads
-  ...etc
+Error: Invalid token
 ```
+**Fix:**
+- Logout e login novamente
+- Verifique JWT_SECRET é igual local/prod
+- Check console.log de errors
 
-## Quick Commands
+### Database Connection Error
+```
+Error: connect ECONNREFUSED
+```
+**Fix:**
+- Supabase project fully created? Aguarde 2-5 min
+- DATABASE_URL copiada corretamente?
+- Supabase > SQL Editor deve funcionar
 
+### Migrations Failed
+```
+Error: relation "usuario" does not exist
+```
+**Fix:**
 ```bash
-# Verificar status
-vercel --list
-
-# Ver logs
-vercel logs --follow
-
-# Rebuild
-vercel deploy --force
-
-# Cancelar deployment
-vercel remove [project-name]
+npx prisma migrate deploy
+# Verifique em Supabase > SQL Editor > Tables
 ```
 
-## Notas Importantes
+### Schema out of sync
+```bash
+npx prisma db push  # Sync from schema.prisma
+# ou
+npx prisma migrate reset  # ⚠️ DELETE ALL DATA and restart
+```
 
-⚠️ **Não committeie .env files** - use Vercel Dashboard para secrets  
-⚠️ **SQLite em Vercel**: Ephemeral filesystem - dados perdem entre deploys  
-⚠️ **JWT_SECRET**: Deve ser aleatório e seguro, nunca igual em dev/prod  
-✅ **Recomendação**: Use PostgreSQL gratuito (Vercel Postgres ou Neon)
+## Common Issues & Solutions
+
+| Erro | Causa | Solução |
+|------|-------|---------|
+| CORS | Backend CORS_ORIGIN diferente | Atualizar env e redeploy |
+| 401 | JWT diferente | Usar mesmo JWT_SECRET |
+| 404 | Routes não carregam | Verifique src/routes/*.js existe |
+| DB timeout | Supabase não criado | Aguarde projeto criar completamente |
+| Blank frontend | API base URL errado | Verifique VITE_API_URL |
+
+##📚 Documentos Importantes
+
+- `SUPABASE_SETUP.md` - Guia Supabase detalhado
+- `backend/.env.example` - Template variáveis
+- `frontend/.env.example` - Template frontend
+- `backend/src/app.js` - Código CORS
+- `frontend/src/services/api.js` - Cliente HTTP
+
+## URLs Finais
+
+```
+Frontend:  https://seu-nome-frontend.vercel.app
+Backend:   https://seu-nome-backend.vercel.app
+API:       https://seu-nome-backend.vercel.app/api
+Health:    https://seu-nome-backend.vercel.app/health
+```
+
+## Segurança
+
+⚠️ **IMPORTANTE:**
+- Nunca commiteie `.env` files
+- Use Vercel Environment Variables
+- JWT_SECRET deve ser random e longo
+- DATABASE_URL é a senha - proteja!
+- Mude JWT_SECRET regularmente em produção
+
+✅ **Recomendações:**
+- Use HTTPS (Vercel automático)
+- Enable 2FA no Supabase/Vercel/GitHub
+- Backup regular (Supabase > Backups)
+- Monitor logs (Vercel & Supabase)
+
+## Support
+
+- [Supabase Docs](https://supabase.com/docs)
+- [Vercel Docs](https://vercel.com/docs)
+- [Prisma + Postgres](https://www.prisma.io/docs/orm/overview/databases/postgresql)
