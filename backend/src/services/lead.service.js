@@ -123,4 +123,4 @@ async function deleteMultiple(ids) {
   return leadRepository.deleteMany(ids);
 }
 
-module.exports = { getAll, getStats: getDashboardStats, getById, create, update, delete: deleteLead, importLeads, deleteMultiple };
+module.exports = { getAll, getStats: getDashboardStats, getDashboardStats, getById, create, update, delete: deleteLead, importLeads, deleteMultiple };
