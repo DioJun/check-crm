@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MessageSquare, Phone, StickyNote, ExternalLink, Edit2, Check, X } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Phone, StickyNote, ExternalLink, Edit2, Check, X, Sparkles, RefreshCw, Copy } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/ui/StatusBadge';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
@@ -43,20 +43,33 @@ export default function LeadDetail() {
   });
   const [savingInfo, setSavingInfo] = useState(false);
 
+  // AI Analysis
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiAnalysisAt, setAiAnalysisAt] = useState(null);
+  const [analyzingAI, setAnalyzingAI] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [copiedField, setCopiedField] = useState('');
+
   useEffect(() => {
     Promise.all([
       api.get(`/leads/${id}`),
       api.get(`/interactions/${id}`),
     ]).then(([leadRes, interRes]) => {
-      setLead(leadRes.data?.lead || leadRes.data);
-      const lead = leadRes.data?.lead || leadRes.data;
+      const l = leadRes.data?.lead || leadRes.data;
+      setLead(l);
       
       // Inicializar form de edição
       setEditForm({
-        site: lead?.site || '',
-        temWhatsapp: lead?.temWhatsapp || false,
-        temSite: lead?.temSite || false,
+        site: l?.site || '',
+        temWhatsapp: l?.temWhatsapp || false,
+        temSite: l?.temSite || false,
       });
+
+      // Carregar análise AI salva
+      if (l?.aiAnalysis) {
+        try { setAiAnalysis(JSON.parse(l.aiAnalysis)); } catch { /* ignorar */ }
+        setAiAnalysisAt(l.aiAnalysisAt);
+      }
       
       const raw = interRes.data?.interactions || interRes.data || [];
       setInteractions([...raw].sort((a, b) => new Date(b.data || b.createdAt) - new Date(a.data || a.createdAt)));
@@ -89,6 +102,27 @@ export default function LeadDetail() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleAnalyzeAI() {
+    setAnalyzingAI(true);
+    setAiError('');
+    try {
+      const res = await api.post(`/leads/${id}/analyze`);
+      setAiAnalysis(res.data.analysis);
+      setAiAnalysisAt(res.data.analyzedAt);
+    } catch (err) {
+      setAiError(err.response?.data?.error || 'Erro ao analisar lead com IA');
+    } finally {
+      setAnalyzingAI(false);
+    }
+  }
+
+  function copyToClipboard(text, field) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(''), 2000);
+    });
   }
 
   async function handleSaveInfo() {
@@ -277,6 +311,137 @@ export default function LeadDetail() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* AI Analysis */}
+      <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-xl shadow-sm p-6 mb-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-violet-600" />
+            <h2 className="text-base font-semibold text-gray-900">Análise de IA — Estratégia de Venda</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            {aiAnalysisAt && (
+              <span className="text-xs text-gray-400">
+                Gerado em {new Date(aiAnalysisAt).toLocaleString('pt-BR')}
+              </span>
+            )}
+            <button
+              onClick={handleAnalyzeAI}
+              disabled={analyzingAI}
+              className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-300 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              {analyzingAI ? (
+                <><RefreshCw className="w-4 h-4 animate-spin" /> Analisando...</>
+              ) : aiAnalysis ? (
+                <><RefreshCw className="w-4 h-4" /> Reanalisar</>
+              ) : (
+                <><Sparkles className="w-4 h-4" /> Analisar com IA</>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {aiError && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">{aiError}</p>
+        )}
+
+        {analyzingAI && (
+          <div className="flex flex-col items-center justify-center py-10 gap-3 text-violet-500">
+            <RefreshCw className="w-8 h-8 animate-spin" />
+            <p className="text-sm font-medium">Consultando IA... pode levar alguns segundos</p>
+          </div>
+        )}
+
+        {!analyzingAI && aiAnalysis && (
+          <div className="space-y-4">
+
+            {/* Prioridade + Diagnóstico */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 bg-white rounded-lg p-4 border border-violet-100">
+                <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide mb-1">🔍 Diagnóstico</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{aiAnalysis.diagnostico}</p>
+              </div>
+              <div className="sm:w-40 bg-white rounded-lg p-4 border border-violet-100 flex flex-col items-center justify-center">
+                <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide mb-2">Prioridade</p>
+                <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                  aiAnalysis.prioridade === 'alta' ? 'bg-red-100 text-red-700' :
+                  aiAnalysis.prioridade === 'media' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {aiAnalysis.prioridade?.toUpperCase()}
+                </span>
+                {aiAnalysis.justificativaPrioridade && (
+                  <p className="text-xs text-gray-400 text-center mt-2 leading-snug">{aiAnalysis.justificativaPrioridade}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Serviço Recomendado */}
+            <div className="bg-white rounded-lg p-4 border border-violet-100">
+              <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide mb-1">💡 Serviço Recomendado</p>
+              <p className="text-sm text-gray-700 leading-relaxed">{aiAnalysis.servicoRecomendado}</p>
+            </div>
+
+            {/* Proposta */}
+            <div className="bg-white rounded-lg p-4 border border-violet-100">
+              <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide mb-1">📋 Proposta</p>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{aiAnalysis.proposta}</p>
+            </div>
+
+            {/* Abordagem */}
+            <div className="bg-white rounded-lg p-4 border border-violet-100">
+              <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide mb-1">🎯 Estratégia de Abordagem</p>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{aiAnalysis.abordagem}</p>
+            </div>
+
+            {/* Como ser convincente */}
+            <div className="bg-white rounded-lg p-4 border border-violet-100">
+              <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide mb-1">🧠 Como Ser Convincente</p>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{aiAnalysis.comoSerConvincente}</p>
+            </div>
+
+            {/* Pitch WhatsApp */}
+            <div className="bg-white rounded-lg p-4 border border-green-100 border-2">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">💬 Pitch WhatsApp (pronto para enviar)</p>
+                <button
+                  onClick={() => copyToClipboard(aiAnalysis.pitchWhatsApp, 'whatsapp')}
+                  className="flex items-center gap-1.5 text-xs text-green-700 hover:text-green-800 border border-green-300 hover:bg-green-50 px-2 py-1 rounded transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {copiedField === 'whatsapp' ? 'Copiado!' : 'Copiar'}
+                </button>
+              </div>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{aiAnalysis.pitchWhatsApp}</p>
+            </div>
+
+            {/* Script Ligação */}
+            {aiAnalysis.pitchLigacao && (
+              <div className="bg-white rounded-lg p-4 border border-blue-100 border-2">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">📞 Script de Ligação (abertura)</p>
+                  <button
+                    onClick={() => copyToClipboard(aiAnalysis.pitchLigacao, 'ligacao')}
+                    className="flex items-center gap-1.5 text-xs text-blue-700 hover:text-blue-800 border border-blue-300 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    {copiedField === 'ligacao' ? 'Copiado!' : 'Copiar'}
+                  </button>
+                </div>
+                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{aiAnalysis.pitchLigacao}</p>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {!analyzingAI && !aiAnalysis && (
+          <div className="text-center py-8 text-gray-400">
+            <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="text-sm">Clique em <strong>Analisar com IA</strong> para gerar proposta, estratégia de abordagem, pitch de WhatsApp e muito mais.</p>
           </div>
         )}
       </div>

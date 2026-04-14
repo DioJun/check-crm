@@ -32,6 +32,8 @@ model Lead {
   temWhatsapp     Boolean?
   temSite         Boolean?
   site            String?
+  aiAnalysis      String?
+  aiAnalysisAt    DateTime?
   interacoes      Interacao[]
 }
 

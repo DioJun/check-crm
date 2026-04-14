@@ -1,4 +1,7 @@
 const leadService = require('../services/lead.service');
+const { analyzeLeadWithGemini } = require('../services/ai.service');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 async function getAll(req, res) {
   try {
@@ -84,4 +87,25 @@ async function deleteMultiple(req, res) {
   }
 }
 
-module.exports = { getAll, getStats, getById, create, update, delete: deleteLead, importLeads, deleteMultiple };
+async function analyzeWithAI(req, res) {
+  try {
+    const lead = await leadService.getById(req.params.id);
+    if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+
+    const analysis = await analyzeLeadWithGemini(lead?.lead || lead);
+
+    const updated = await prisma.lead.update({
+      where: { id: req.params.id },
+      data: {
+        aiAnalysis: JSON.stringify(analysis),
+        aiAnalysisAt: new Date(),
+      },
+    });
+
+    return res.json({ analysis, analyzedAt: updated.aiAnalysisAt });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+module.exports = { getAll, getStats, getById, create, update, delete: deleteLead, importLeads, deleteMultiple, analyzeWithAI };

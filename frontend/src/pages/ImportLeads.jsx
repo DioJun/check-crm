@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Upload, ArrowRight, Check, AlertCircle, MapPin, Link2 } from 'lucide-react';
+import { Upload, ArrowRight, Check, AlertCircle, MapPin, UserPlus, Clock } from 'lucide-react';
 import api from '../services/api';
-import GoogleMapsScraper from '../components/Scraper/GoogleMapsScraper';
 
 export default function ImportLeads() {
   const [step, setStep] = useState(1); // 1: upload, 2: mapping, 3: confirm, 4: success
@@ -9,7 +8,12 @@ export default function ImportLeads() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showScraper, setShowScraper] = useState(false);
+
+  // Manual lead form
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualForm, setManualForm] = useState({ nome: '', telefone: '', cidade: '', servico: '', origem: 'Manual' });
+  const [savingManual, setSavingManual] = useState(false);
+  const [manualError, setManualError] = useState('');
 
   // Data from spreadsheet
   const [spreadsheetData, setSpreadsheetData] = useState(null);
@@ -202,42 +206,25 @@ export default function ImportLeads() {
     setSuccess('');
   }
 
-  async function handleScrapedData(scrapedData) {
-    // Converter dados do scraper para o formato de lead
-    setLoading(true);
+  async function handleSaveManual(e) {
+    e.preventDefault();
+    if (!manualForm.nome.trim()) { setManualError('Nome é obrigatório'); return; }
+    setSavingManual(true);
+    setManualError('');
     try {
-      // Tentar salvar diretamente como um novo lead
-      const leadData = {
-        nome: scrapedData.nome,
-        telefone: scrapedData.telefone,
-        cidade: scrapedData.website ? new URL(scrapedData.website).hostname : '',
-        servico: '',
-        origem: 'Google Maps Scraper',
-        avaliacoes: scrapedData.avaliacoes,
-        temWhatsapp: !!scrapedData.telefone,
-        temSite: !!scrapedData.website,
-        site: scrapedData.website,
-      };
-
-      // Fazer POST direto para criar o lead
-      const res = await api.post('/leads', leadData);
-      
-      if (res.data) {
-        setSuccess(`✓ Lead "${scrapedData.nome}" importado com sucesso!`);
-        setShowScraper(false);
-        setError('');
-        
-        // Mostrar tela de sucesso por 3 segundos
-        setTimeout(() => {
-          setSuccess('');
-        }, 3000);
-      }
+      await api.post('/leads', manualForm);
+      setManualForm({ nome: '', telefone: '', cidade: '', servico: '', origem: 'Manual' });
+      setSuccess('✓ Lead adicionado com sucesso!');
+      setShowManualForm(false);
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao salvar lead: ' + err.message);
+      setManualError(err.response?.data?.error || 'Erro ao salvar lead');
     } finally {
-      setLoading(false);
+      setSavingManual(false);
     }
   }
+
+
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -285,35 +272,88 @@ export default function ImportLeads() {
       {/* Step 1: Upload */}
       {step === 1 && (
         <div className="space-y-6">
-          {/* Google Maps Scraper Card */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-6">
-            <div className="flex items-start gap-4">
+
+          {/* Manual Lead Card */}
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-6">
+            <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <MapPin className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Google Maps Scraper
-                  </h3>
+                  <UserPlus className="w-5 h-5 text-green-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">Adicionar Lead Manualmente</h3>
                 </div>
-                <p className="text-gray-600 text-sm mb-4">
-                  Não quer fazer upload? Cole a URL de um negócio no Google Maps e extraímos os dados automaticamente!
-                </p>
+                <p className="text-gray-600 text-sm mb-4">Adicione um lead individualmente preenchendo os dados direto pelo formulário.</p>
                 <button
-                  onClick={() => setShowScraper(true)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                  onClick={() => setShowManualForm(v => !v)}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
                 >
-                  <Link2 className="w-4 h-4" />
-                  Usar Scraper
+                  {showManualForm ? 'Cancelar' : 'Adicionar Lead'}
                 </button>
               </div>
-              <div className="text-4xl">📍</div>
+              <div className="text-4xl">✍️</div>
+            </div>
+
+            {showManualForm && (
+              <form onSubmit={handleSaveManual} className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {manualError && <p className="col-span-2 text-sm text-red-600">{manualError}</p>}
+                <input
+                  required
+                  placeholder="Nome / Empresa *"
+                  value={manualForm.nome}
+                  onChange={e => setManualForm(f => ({ ...f, nome: e.target.value }))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <input
+                  placeholder="Telefone"
+                  value={manualForm.telefone}
+                  onChange={e => setManualForm(f => ({ ...f, telefone: e.target.value }))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <input
+                  placeholder="Cidade"
+                  value={manualForm.cidade}
+                  onChange={e => setManualForm(f => ({ ...f, cidade: e.target.value }))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <input
+                  placeholder="Serviço / Ramo"
+                  value={manualForm.servico}
+                  onChange={e => setManualForm(f => ({ ...f, servico: e.target.value }))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <div className="col-span-2 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={savingManual}
+                    className="px-5 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    {savingManual ? 'Salvando...' : 'Salvar Lead'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {/* Scraper Card — Em Breve */}
+          <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-lg p-6 opacity-70">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="w-5 h-5 text-gray-400" />
+                  <h3 className="text-lg font-semibold text-gray-500">Google Maps Scraper</h3>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                    <Clock className="w-3 h-3" /> Em breve
+                  </span>
+                </div>
+                <p className="text-gray-400 text-sm">Busca automática de negócios no Google Maps. Disponível em versão futura.</p>
+              </div>
+              <div className="text-4xl opacity-30">📍</div>
             </div>
           </div>
 
           {/* OR Divider */}
           <div className="flex items-center gap-4">
             <div className="flex-1 border-t border-gray-300"></div>
-            <span className="text-gray-500 font-medium">OU</span>
+            <span className="text-gray-500 font-medium">OU IMPORTAR PLANILHA</span>
             <div className="flex-1 border-t border-gray-300"></div>
           </div>
 
@@ -648,13 +688,6 @@ export default function ImportLeads() {
         </div>
       )}
 
-      {/* Google Maps Scraper Modal */}
-      {showScraper && (
-        <GoogleMapsScraper
-          onDataScraped={handleScrapedData}
-          onClose={() => setShowScraper(false)}
-        />
-      )}
     </div>
   );
 }
