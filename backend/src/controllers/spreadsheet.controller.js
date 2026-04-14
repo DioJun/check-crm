@@ -1,6 +1,7 @@
 const multer = require('multer');
 const XLSX = require('xlsx');
 const leadService = require('../services/lead.service');
+const { normalizarTelefone } = require('../services/phone.service');
 
 // Configurar multer para aceitar apenas xlsx e csv
 const upload = multer({
@@ -34,28 +35,13 @@ function isGoogleMapsPlanilha(columns) {
 }
 
 /**
- * Extrai telefone de uma string
+ * Extrai e normaliza telefone de uma string
  */
 function extrairTelefone(texto) {
   if (!texto) return '';
-  
-  // Padrão para telefones brasileiros: (XX) XXXXX-XXXX, (XX) XXXX-XXXX, +55 XX XXXXX-XXXX, etc
-  const padroes = [
-    /\+?55\s?[\(]?(\d{2})[\)]?\s?(\d{4,5})\-?(\d{4})/,  // +55 (XX) XXXXX-XXXX
-    /[\(]?(\d{2})[\)]?\s?(\d{4,5})\-?(\d{4})/            // (XX) XXXXX-XXXX
-  ];
-  
-  for (const padrao of padroes) {
-    const match = String(texto).match(padrao);
-    if (match) {
-      const ddd = match[1];
-      const primeira = match[2];
-      const segunda = match[3];
-      return `+55${ddd}${primeira}${segunda}`;
-    }
-  }
-  
-  return '';
+
+  // Tenta normalizar diretamente (remove formatação e valida)
+  return normalizarTelefone(texto) || '';
 }
 
 /**
@@ -215,14 +201,8 @@ async function importFromSpreadsheet(req, res) {
       
       if (mapping.nome && row[mapping.nome]) lead.nome = String(row[mapping.nome]).trim();
       if (mapping.telefone && row[mapping.telefone]) {
-        let phone = String(row[mapping.telefone]).replace(/\D/g, '');
-        if (!phone.startsWith('55')) {
-          phone = '55' + phone;
-        }
-        if (!phone.startsWith('+')) {
-          phone = '+' + phone;
-        }
-        lead.telefone = phone;
+        const normalized = normalizarTelefone(row[mapping.telefone]);
+        if (normalized) lead.telefone = normalized;
       }
       if (mapping.cidade && row[mapping.cidade]) lead.cidade = String(row[mapping.cidade]).trim();
       if (mapping.servico && row[mapping.servico]) lead.servico = String(row[mapping.servico]).trim();
@@ -265,10 +245,8 @@ async function importGoogleMapsLeads(req, res) {
         
         // Se não tem nome, não é um lead válido
         if (lead.nome) {
-          // Usar telefone extraído ou fornecido
-          const telefone = (lead.telefone && lead.telefone.trim()) 
-            ? lead.telefone 
-            : '';
+          // Normalizar telefone extraído
+          const telefone = (lead.telefone ? normalizarTelefone(lead.telefone) : '');
 
           return {
             nome: lead.nome,
@@ -279,7 +257,7 @@ async function importGoogleMapsLeads(req, res) {
             origem: 'Google Maps',
             avaliacao: lead.avaliacao,
             reviews: lead.reviews,
-            temWhatsapp: temWhatsapp || (telefone ? true : false), // Se tiver telefone extraído, assume que tem WhatsApp
+            temWhatsapp: temWhatsapp || (telefone ? true : false), // Se tiver telefone válido, assume que tem WhatsApp
             temSite: temSite,
             site: lead.site || ''
           };
@@ -313,16 +291,7 @@ async function checkDuplicates(req, res) {
 
     // Normalizar telefones
     const leadsDuplicateInfo = leads.map((lead, idx) => {
-      let telefone = '';
-      if (lead.telefone && lead.telefone.trim()) {
-        telefone = lead.telefone.replace(/\D/g, '');
-        if (!telefone.startsWith('55')) {
-          telefone = '55' + telefone;
-        }
-        if (!telefone.startsWith('+')) {
-          telefone = '+' + telefone;
-        }
-      }
+      const telefone = (lead.telefone ? normalizarTelefone(lead.telefone) : '');
       
       return {
         idx,
