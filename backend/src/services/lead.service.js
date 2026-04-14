@@ -134,7 +134,7 @@ async function importLeads(leads) {
   const skipped = normalized.length - toInsert.length;
 
   if (toInsert.length > 0) {
-    await Promise.all(toInsert.map((lead) => leadRepository.create(lead)));
+    await leadRepository.createMany(toInsert);
   }
 
   return { imported: toInsert.length, skipped, total: normalized.length };

@@ -64,6 +64,10 @@ async function findManyByTelefone(telefones) {
   });
 }
 
+async function createMany(leads) {
+  return prisma.lead.createMany({ data: leads, skipDuplicates: true });
+}
+
 async function deleteMany(ids) {
   return prisma.lead.deleteMany({
     where: { id: { in: ids } }
@@ -75,6 +79,7 @@ module.exports = {
   findById,
   findByTelefone,
   create,
+  createMany,
   update,
   delete: deleteLead,
   countByStatus,
