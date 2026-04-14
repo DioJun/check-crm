@@ -1,4 +1,7 @@
 const leadService = require('../services/lead.service');
+const aiService = require('../services/ai.service');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 async function getAll(req, res) {
   try {
@@ -84,4 +87,19 @@ async function deleteMultiple(req, res) {
   }
 }
 
-module.exports = { getAll, getStats, getById, create, update, delete: deleteLead, importLeads, deleteMultiple };
+async function analyzeWithAI(req, res) {
+  try {
+    const lead = await leadService.getById(req.params.id);
+    const analysis = await aiService.analyzeLeadWithGemini(lead);
+    const updated = await prisma.lead.update({
+      where: { id: req.params.id },
+      data: { aiAnalysis: analysis, aiAnalysisAt: new Date() },
+    });
+    return res.json({ analysis, aiAnalysisAt: updated.aiAnalysisAt });
+  } catch (err) {
+    const status = err.status || 500;
+    return res.status(status).json({ error: err.message });
+  }
+}
+
+module.exports = { getAll, getStats, getById, create, update, delete: deleteLead, importLeads, deleteMultiple, analyzeWithAI };

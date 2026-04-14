@@ -4,19 +4,28 @@ const cors = require('cors');
 
 const app = express();
 
-// Configurar CORS para múltiplos origins
+// Configurar CORS — aceita origins do env ou localhost por padrão
 app.use(cors({
   origin: function (origin, callback) {
-    const allowedOrigins = ['http://localhost:5173', 'https://check-crm-opf9.vercel.app', 'localhost'];
-    
-    // Se for desenvolvimento ou origin está na lista
-    if (!origin || allowedOrigins.includes(origin) || origin.includes('localhost')) {
+    // Sem origin = requisição local (curl, Postman, Electron, SSR)
+    if (!origin) return callback(null, true);
+
+    // Lista de origins permitidos: localhost + qualquer valor em ALLOWED_ORIGINS
+    const extras = (process.env.ALLOWED_ORIGINS || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+    const isAllowed = extras.includes(origin);
+
+    if (isLocalhost || isAllowed) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
 }));
 
 app.use(express.json());

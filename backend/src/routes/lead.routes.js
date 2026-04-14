@@ -17,6 +17,7 @@ router.get('/', leadController.getAll);
 router.get('/:id', leadController.getById);
 router.post('/', leadController.create);
 router.post('/import', leadController.importLeads);
+router.post('/:id/analyze', leadController.analyzeWithAI);
 router.put('/:id', leadController.update);
 router.delete('/:id', leadController.delete);
 router.delete('/', leadController.deleteMultiple);

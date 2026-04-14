@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MessageSquare, Phone, StickyNote, ExternalLink, Edit2, Check, X } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Phone, StickyNote, ExternalLink, Edit2, Check, X, Sparkles, RefreshCw } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/ui/StatusBadge';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
@@ -43,6 +43,12 @@ export default function LeadDetail() {
   });
   const [savingInfo, setSavingInfo] = useState(false);
 
+  // Análise IA
+  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [aiAnalysisAt, setAiAnalysisAt] = useState(null);
+  const [analyzingAI, setAnalyzingAI] = useState(false);
+  const [aiError, setAiError] = useState('');
+
   useEffect(() => {
     Promise.all([
       api.get(`/leads/${id}`),
@@ -60,6 +66,11 @@ export default function LeadDetail() {
       
       const raw = interRes.data?.interactions || interRes.data || [];
       setInteractions([...raw].sort((a, b) => new Date(b.data || b.createdAt) - new Date(a.data || a.createdAt)));
+      if (leadRes.data?.lead?.aiAnalysis || leadRes.data?.aiAnalysis) {
+        const l = leadRes.data?.lead || leadRes.data;
+        setAiAnalysis(l.aiAnalysis || '');
+        setAiAnalysisAt(l.aiAnalysisAt || null);
+      }
     }).catch(() => setError('Erro ao carregar dados do lead'))
       .finally(() => setLoading(false));
   }, [id]);
@@ -101,6 +112,20 @@ export default function LeadDetail() {
       setError('Erro ao atualizar informações');
     } finally {
       setSavingInfo(false);
+    }
+  }
+
+  async function handleAnalyzeAI() {
+    setAnalyzingAI(true);
+    setAiError('');
+    try {
+      const res = await api.post(`/leads/${id}/analyze`, {});
+      setAiAnalysis(res.data.analysis);
+      setAiAnalysisAt(res.data.aiAnalysisAt);
+    } catch (err) {
+      setAiError(err.response?.data?.error || 'Erro ao analisar com IA');
+    } finally {
+      setAnalyzingAI(false);
     }
   }
 
@@ -277,6 +302,63 @@ export default function LeadDetail() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* AI Analysis section */}
+      <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-xl border border-indigo-100 shadow-sm p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-indigo-600" />
+            <h2 className="text-base font-semibold text-gray-900">Análise com IA</h2>
+          </div>
+          <button
+            onClick={handleAnalyzeAI}
+            disabled={analyzingAI}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            {analyzingAI ? (
+              <><RefreshCw className="w-4 h-4 animate-spin" />Analisando...</>
+            ) : aiAnalysis ? (
+              <><RefreshCw className="w-4 h-4" />Reanalisar</>
+            ) : (
+              <><Sparkles className="w-4 h-4" />Analisar Lead</>
+            )}
+          </button>
+        </div>
+
+        {aiError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            {aiError}
+            {aiError.includes('GEMINI_API_KEY') && (
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="ml-1 underline font-medium">
+                Obter chave gratuita →
+              </a>
+            )}
+          </div>
+        )}
+
+        {aiAnalysis ? (
+          <div>
+            {aiAnalysisAt && (
+              <p className="text-xs text-gray-400 mb-3">Última análise: {formatDateTime(aiAnalysisAt)}</p>
+            )}
+            <div className="bg-white rounded-lg p-4 border border-indigo-100 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+              {aiAnalysis}
+            </div>
+          </div>
+        ) : (
+          !analyzingAI && (
+            <p className="text-sm text-gray-500 text-center py-4">
+              Clique em "Analisar Lead" para gerar uma análise estratégica com sugestões de pitch e oportunidades para este cliente.
+            </p>
+          )
+        )}
+        {analyzingAI && (
+          <div className="flex items-center justify-center gap-3 py-6 text-indigo-600">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Gemini está analisando o lead...</span>
           </div>
         )}
       </div>
