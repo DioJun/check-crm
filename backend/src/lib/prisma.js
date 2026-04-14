@@ -1,9 +1,4 @@
 const { PrismaClient } = require('@prisma/client');
-const path = require('path');
-
-// Garantir que o caminho do SQLite resolve corretamente independente do CWD
-const dbPath = path.resolve(__dirname, '../../dev.db');
-process.env.DATABASE_URL = `file:${dbPath}`;
 
 let prisma;
 
