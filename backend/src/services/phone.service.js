@@ -2,6 +2,10 @@
  * Normaliza e valida telefones brasileiros
  */
 
+/**
+ * Normaliza e valida telefones brasileiros
+ */
+
 function normalizarTelefone(telefone) {
   if (!telefone) return '';
 
@@ -10,8 +14,18 @@ function normalizarTelefone(telefone) {
 
   if (!apenas_numeros) return '';
 
-  // Remove "55" do início se estiver lá (pode estar duplicado)
-  while (apenas_numeros.startsWith('55') && apenas_numeros.length > 12) {
+  // Remove TODOS os "55" do início enquanto o número tiver 12+ dígitos
+  // (indicando duplicação do prefixo do país)
+  while (apenas_numeros.startsWith('55') && apenas_numeros.length > 11) {
+    const possibilidade = apenas_numeros.slice(2);
+    // Se remover deixaria com menos de 10 dígitos, não remove
+    if (possibilidade.length < 10) break;
+    apenas_numeros = possibilidade;
+  }
+
+  // Agora, se ainda começar com "55", remove exatamente UMA VEZ
+  // (pode ser o prefixo de país + DDD)
+  if (apenas_numeros.startsWith('55') && apenas_numeros.length === 12) {
     apenas_numeros = apenas_numeros.slice(2);
   }
 
@@ -27,7 +41,7 @@ function normalizarTelefone(telefone) {
     return '';
   }
 
-  // Se for celular (9 dígitos) ou fixo (8 dígitos), valida o primeiro dígito pós-DDD
+  // Se for celular (11 dígitos = 9 após DDD), valida o primeiro dígito pós-DDD
   const resto = apenas_numeros.slice(2);
   if (resto.length === 9 && !['6', '7', '8', '9'].includes(resto[0])) {
     // Celular deve começar com 6-9

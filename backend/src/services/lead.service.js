@@ -1,4 +1,5 @@
 const leadRepository = require('../repositories/lead.repository');
+const { normalizarTelefone } = require('./phone.service');
 
 async function getAll(filters) {
   return leadRepository.findAll(filters);
@@ -25,7 +26,7 @@ async function create(data) {
  * Converte avaliacoes → avaliacao, remove fields extras, etc
  */
 function mapScraperDataToSchema(lead) {
-  const tel = (lead.telefone && lead.telefone.trim()) ? normalizeTelefone(lead.telefone) : '';
+  const tel = (lead.telefone && lead.telefone.trim()) ? normalizarTelefone(lead.telefone) : '';
   
   return {
     nome: lead.nome?.trim() || 'Sem nome',
@@ -66,28 +67,6 @@ async function getDashboardStats() {
   return { total, byStatus, today, conversionRate: parseFloat(conversionRate) };
 }
 
-function normalizeTelefone(telefone) {
-  // Primeiro: extrair o padrão de telefone brasileiro da string (evita capturar horários etc.)
-  const phoneMatch = telefone.match(/\(?0?\d{2}\)?\s*\d{4,5}-?\d{4}/);
-  const cleanInput = phoneMatch ? phoneMatch[0] : telefone;
-
-  const digits = cleanInput.replace(/\D/g, '');
-
-  // Remover zero inicial do DDD (0XX)
-  const normalized = digits.startsWith('0') ? digits.slice(1) : digits;
-
-  // Telefone brasileiro válido: DDD(2) + número(8 ou 9) = 10 ou 11 dígitos
-  if (normalized.length < 10 || normalized.length > 11) {
-    // Se já começa com 55, pode ter 12 ou 13 dígitos
-    if (normalized.startsWith('55') && normalized.length >= 12 && normalized.length <= 13) {
-      return `+${normalized}`;
-    }
-    return ''; // Número inválido
-  }
-
-  return `+55${normalized}`;
-}
-
 async function importLeads(leads) {
   const now = new Date();
 
@@ -96,7 +75,7 @@ async function importLeads(leads) {
   const normalized = [];
   
   for (const lead of leads) {
-    const tel = (lead.telefone && lead.telefone.trim()) ? normalizeTelefone(lead.telefone) : '';
+    const tel = (lead.telefone && lead.telefone.trim()) ? normalizarTelefone(lead.telefone) : '';
     const key = tel || lead.nome;
     
     if (!seen.has(key)) {
@@ -144,4 +123,4 @@ async function deleteMultiple(ids) {
   return leadRepository.deleteMany(ids);
 }
 
-module.exports = { getAll, getById, create, update, delete: deleteLead, getDashboardStats, importLeads, deleteMultiple };
+module.exports = { getAll, getStats: getDashboardStats, getById, create, update, delete: deleteLead, importLeads, deleteMultiple };

@@ -1,5 +1,15 @@
 export default function WhatsAppButton({ telefone, nome, className = '' }) {
-  const cleanPhone = telefone?.replace(/\D/g, '') || '';
+  // Remove tudo que não é dígito
+  let cleanPhone = telefone?.replace(/\D/g, '') || '';
+  
+  // Remove "55" do início se existir (já é prefixo do país)
+  while (cleanPhone.startsWith('55') && cleanPhone.length > 11) {
+    cleanPhone = cleanPhone.slice(2);
+  }
+  if (cleanPhone.startsWith('55') && cleanPhone.length === 12) {
+    cleanPhone = cleanPhone.slice(2);
+  }
+  
   const encodedName = encodeURIComponent(nome || '');
   const url = `https://wa.me/55${cleanPhone}?text=Oi%20${encodedName},%20tudo%20bem`;
 
