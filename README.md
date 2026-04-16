@@ -6,7 +6,7 @@ CRM Desktop com Google Maps Scraper para geração de leads.
 
 - **Dashboard** - Visão geral: total de leads, por status, taxa de conversão
 - **Lista de Leads** - Tabela com filtros por status, cidade, serviço e nome
-- **Pipeline (Kanban)** - Colunas Novo / Contatado / Interessado / Fechado com drag-and-drop
+- **Pipeline (Kanban)** - Colunas Novo / Sem Contato / Contatado / Interessado / Fechado com drag-and-drop
 - **Detalhe do Lead** - Histórico de interações e botão WhatsApp
 - **Google Maps Scraper** - Busca por termo (ex: "Eletricistas em Curitiba") e importa leads
 - **Importação em lote** - Upload de planilha ou importação via scraper
@@ -160,7 +160,7 @@ model Lead {
   telefone        String       @unique
   cidade          String?
   servico         String?
-  status          LeadStatus   @default(novo)  // novo | contatado | interessado | fechado
+  status          LeadStatus   @default(novo)  // novo | sem_contato | contatado | interessado | fechado
   origem          String?
   dataEntrada     DateTime     @default(now())
   ultimaInteracao DateTime?

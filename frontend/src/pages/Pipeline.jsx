@@ -21,6 +21,7 @@ import WhatsAppButton from '../components/ui/WhatsAppButton';
 
 const COLUMNS = [
   { id: 'novo', label: 'Novo', color: 'bg-blue-500', light: 'bg-blue-50 border-blue-200' },
+  { id: 'sem_contato', label: 'Sem Contato', color: 'bg-red-500', light: 'bg-red-50 border-red-200' },
   { id: 'contatado', label: 'Contatado', color: 'bg-yellow-500', light: 'bg-yellow-50 border-yellow-200' },
   { id: 'interessado', label: 'Interessado (Negociação)', color: 'bg-orange-500', light: 'bg-orange-50 border-orange-200' },
   { id: 'fechado', label: 'Fechado', color: 'bg-green-500', light: 'bg-green-50 border-green-200' },

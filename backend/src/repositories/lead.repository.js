@@ -36,7 +36,7 @@ async function countByStatus() {
     _count: { status: true },
   });
 
-  const counts = { novo: 0, contatado: 0, interessado: 0, fechado: 0 };
+  const counts = { novo: 0, sem_contato: 0, contatado: 0, interessado: 0, fechado: 0 };
   for (const row of results) {
     counts[row.status] = row._count.status;
   }

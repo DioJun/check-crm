@@ -1,5 +1,6 @@
 const STATUS_CONFIG = {
   novo: { label: 'Novo', classes: 'bg-blue-100 text-blue-800' },
+  sem_contato: { label: 'Sem Contato', classes: 'bg-red-100 text-red-800' },
   contatado: { label: 'Contatado', classes: 'bg-yellow-100 text-yellow-800' },
   interessado: { label: 'Interessado', classes: 'bg-orange-100 text-orange-800' },
   fechado: { label: 'Fechado', classes: 'bg-green-100 text-green-800' },

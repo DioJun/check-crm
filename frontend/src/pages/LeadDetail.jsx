@@ -5,7 +5,7 @@ import api from '../services/api';
 import StatusBadge from '../components/ui/StatusBadge';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
 
-const STATUSES = ['novo', 'contatado', 'interessado', 'fechado'];
+const STATUSES = ['novo', 'sem_contato', 'contatado', 'interessado', 'fechado'];
 const TIPOS = [
   { value: 'mensagem', label: 'Mensagem', icon: MessageSquare },
   { value: 'ligacao', label: 'Ligação', icon: Phone },
