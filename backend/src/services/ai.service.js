@@ -100,14 +100,55 @@ Retorne este JSON exatamente (preencha todos os campos):
   const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
   // Strip any markdown code fences if the model added them
-  const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+  let cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+
+  // Tentar fazer parse do JSON limpo
+  try {
+    return JSON.parse(cleaned);
+  } catch (parseErr) {
+    // Se falhar, tentar fix adicional: remover quebras de linha dentro de strings JSON
+    // Esta é uma abordagem mais agressiva que trata caracteres problemáticos
+    
+    // Função auxiliar para escapar strings JSON
+    const fixJsonString = (str) => {
+      // Encontrar todas as strings entre aspas e escapar caracteres problemáticos
+      return str.replace(/"([^"\\]|\\.)*"/g, (match) => {
+        // Dentro das aspas, escapar quebras de linha e caracteres especiais
+        return match
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r')
+          .replace(/\t/g, '\\t')
+          .replace(/"/g, (m, i) => i === 0 || i === match.length - 1 ? m : '\\"');
+      });
+    };
+
+    try {
+      cleaned = fixJsonString(cleaned);
+      return JSON.parse(cleaned);
+    } catch (secondErr) {
+      // Se ainda falhar, logar o erro e tentar usar regex para extrair os campos
+      console.error(`[AI Analysis] JSON parsing failed: ${parseErr.message}`);
+      console.error(`[AI Analysis] Raw response:`, raw.substring(0, 200) + '...');
+      
+      // Fallback: retornar um objeto padrão com mensagem de erro
+      return {
+        diagnostico: 'Erro ao processar análise da IA. Tente novamente.',
+        servicoRecomendado: 'Recomendação não disponível',
+        proposta: 'Não foi possível gerar proposta',
+        abordagem: 'Não foi possível gerar abordagem',
+        comoSerConvincente: 'Não foi possível gerar argumentos',
+        pitchWhatsApp: 'Não foi possível gerar pitch',
+        pitchLigacao: 'Não foi possível gerar script',
+        prioridade: 'media',
+        justificativaPrioridade: 'Análise indisponível no momento'
+      };
+    }
+  }
 
   // Log sucesso se teve retries
   if (retryCount > 0) {
     console.log(`[Gemini API] Sucesso após ${retryCount} retry(ies)!`);
   }
-
-  return JSON.parse(cleaned);
 }
 
 module.exports = { analyzeLeadWithGemini };
