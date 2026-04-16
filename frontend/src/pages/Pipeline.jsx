@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
   pointerWithin,
@@ -131,6 +132,7 @@ function Column({ column, leads, onMoveClick, onDeleteClick, onViewClick }) {
 }
 
 export default function Pipeline() {
+  const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState(null);
@@ -349,12 +351,15 @@ export default function Pipeline() {
               >
                 Fechar
               </button>
-              <a
-                href={`/leads/${viewedLead.id}`}
+              <button
+                onClick={() => {
+                  setViewedLead(null);
+                  navigate(`/leads/${viewedLead.id}`);
+                }}
                 className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors text-center"
               >
                 Ver Completo
-              </a>
+              </button>
             </div>
           </div>
         </div>
