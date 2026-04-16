@@ -6,7 +6,7 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function analyzeLeadWithGemini(lead, retryCount = 0, maxRetries = 5) {
+async function analyzeLeadWithGemini(lead, retryCount = 0, maxRetries = 10) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
 
@@ -78,14 +78,31 @@ Retorne este JSON exatamente (preencha todos os campos):
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const errorMessage = err?.error?.message || `Gemini API error ${res.status}`;
+    let errorMessage = '';
+    let errorDetails = {};
+    
+    try {
+      errorDetails = await res.json();
+      errorMessage = errorDetails?.error?.message || `Gemini API error ${res.status}`;
+    } catch {
+      errorMessage = `Gemini API error ${res.status}`;
+    }
+    
+    console.log(`[Gemini API] Resposta de erro: ${errorMessage}`);
     
     // Se for erro de alta demanda (429 ou mensagem específica), fazer retry
-    if ((res.status === 429 || errorMessage.includes('high demand')) && retryCount < maxRetries) {
-      // Backoff exponencial: 1s, 2s, 4s, 8s, 16s
-      const delayMs = Math.pow(2, retryCount) * 1000;
-      console.log(`[Gemini API] Alta demanda. Tentativa ${retryCount + 1}/${maxRetries}. Aguardando ${delayMs}ms...`);
+    const isHighDemandError = res.status === 429 || 
+                              errorMessage.toLowerCase().includes('high demand') || 
+                              errorMessage.toLowerCase().includes('resource exhausted') ||
+                              errorMessage.toLowerCase().includes('quota') ||
+                              res.status === 503 || // Service Unavailable
+                              res.status === 502;   // Bad Gateway
+    
+    if (isHighDemandError && retryCount < maxRetries) {
+      // Backoff exponencial com mais tempo: 2s, 4s, 8s, 16s, 32s, 64s, etc.
+      const delayMs = Math.pow(2, retryCount + 1) * 1000;
+      const totalTime = Math.round(delayMs / 1000);
+      console.log(`[Gemini API] Alta demanda detectada. Tentativa ${retryCount + 1}/${maxRetries}. Aguardando ${totalTime}s...`);
       
       await sleep(delayMs);
       
