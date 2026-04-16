@@ -1,7 +1,12 @@
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-async function analyzeLeadWithGemini(lead) {
+// Função para aguardar com delay
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function analyzeLeadWithGemini(lead, retryCount = 0, maxRetries = 5) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
 
@@ -74,7 +79,21 @@ Retorne este JSON exatamente (preencha todos os campos):
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `Gemini API error ${res.status}`);
+    const errorMessage = err?.error?.message || `Gemini API error ${res.status}`;
+    
+    // Se for erro de alta demanda (429 ou mensagem específica), fazer retry
+    if ((res.status === 429 || errorMessage.includes('high demand')) && retryCount < maxRetries) {
+      // Backoff exponencial: 1s, 2s, 4s, 8s, 16s
+      const delayMs = Math.pow(2, retryCount) * 1000;
+      console.log(`[Gemini API] Alta demanda. Tentativa ${retryCount + 1}/${maxRetries}. Aguardando ${delayMs}ms...`);
+      
+      await sleep(delayMs);
+      
+      // Tentar novamente recursivamente
+      return analyzeLeadWithGemini(lead, retryCount + 1, maxRetries);
+    }
+    
+    throw new Error(errorMessage);
   }
 
   const data = await res.json();
@@ -82,6 +101,11 @@ Retorne este JSON exatamente (preencha todos os campos):
 
   // Strip any markdown code fences if the model added them
   const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+
+  // Log sucesso se teve retries
+  if (retryCount > 0) {
+    console.log(`[Gemini API] Sucesso após ${retryCount} retry(ies)!`);
+  }
 
   return JSON.parse(cleaned);
 }
