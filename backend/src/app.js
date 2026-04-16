@@ -4,32 +4,31 @@ const cors = require('cors');
 
 const app = express();
 
-// Configurar CORS para múltiplos origins
+// Configurar CORS
 app.use(cors({
   origin: function (origin, callback) {
-    // Em produção, usar ENV variable (CORS_ORIGIN)
-    const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'localhost',
-      'http://localhost',
-      corsOrigin,
-      // Aceitar qualquer vercel.app para desenvolvimento
-      ...(process.env.NODE_ENV === 'development' ? ['*.vercel.app'] : [])
-    ].filter(Boolean);
-    
-    // Se for desenvolvimento ou origin está na lista
-    if (!origin || allowedOrigins.includes(origin) || 
-        origin.includes('localhost') || 
-        origin.includes('vercel.app')) {
-      callback(null, true);
-    } else {
-      console.warn('[CORS] Bloqueado:', origin);
-      callback(new Error('Not allowed by CORS'));
+    // Em desenvolvimento, aceitar localhost
+    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
     }
+    
+    // Em produção, aceitar qualquer vercel.app
+    if (origin && origin.includes('vercel.app')) {
+      return callback(null, true);
+    }
+    
+    // Aceitar origens configuradas via ENV
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    console.warn('[CORS] Bloqueado:', origin);
+    callback(new Error('Not allowed by CORS'));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
