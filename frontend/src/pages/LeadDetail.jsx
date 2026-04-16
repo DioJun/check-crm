@@ -16,6 +16,7 @@ const TIPO_COLORS = {
   mensagem: 'bg-blue-100 text-blue-800',
   ligacao: 'bg-green-100 text-green-800',
   anotacao: 'bg-yellow-100 text-yellow-800',
+  ia_analysis: 'bg-violet-100 text-violet-800',
 };
 
 function formatDateTime(str) {
@@ -111,6 +112,13 @@ export default function LeadDetail() {
       const res = await api.post(`/leads/${id}/analyze`);
       setAiAnalysis(res.data.analysis);
       setAiAnalysisAt(res.data.analyzedAt);
+      
+      // Recarregar interações para incluir o registro da análise de IA
+      try {
+        const interRes = await api.get(`/interactions/${id}`);
+        const raw = interRes.data?.interactions || interRes.data || [];
+        setInteractions([...raw].sort((a, b) => new Date(b.data || b.createdAt) - new Date(a.data || a.createdAt)));
+      } catch { /* ignorar erro ao recarregar */ }
     } catch (err) {
       setAiError(err.response?.data?.error || 'Erro ao analisar lead com IA');
     } finally {
@@ -494,15 +502,15 @@ export default function LeadDetail() {
         ) : (
           <div className="space-y-3">
             {interactions.map((item, idx) => (
-              <div key={item.id || idx} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+              <div key={item.id || idx} className={`flex gap-3 p-4 rounded-lg ${item.tipo === 'ia_analysis' ? 'bg-violet-50 border border-violet-200' : 'bg-gray-50'}`}>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${TIPO_COLORS[item.tipo] || 'bg-gray-100 text-gray-700'}`}>
-                      {item.tipo}
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold ${TIPO_COLORS[item.tipo] || 'bg-gray-100 text-gray-700'}`}>
+                      {item.tipo === 'ia_analysis' ? '✨ Análise IA' : item.tipo}
                     </span>
                     <span className="text-xs text-gray-400">{formatDateTime(item.data || item.createdAt)}</span>
                   </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.conteudo}</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{item.conteudo}</p>
                 </div>
               </div>
             ))}

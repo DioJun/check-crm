@@ -89,10 +89,33 @@ async function deleteMultiple(req, res) {
 
 async function analyzeWithAI(req, res) {
   try {
-    const lead = await leadService.getById(req.params.id);
+    const lead = await prisma.lead.findUnique({
+      where: { id: req.params.id },
+      include: { interacoes: { orderBy: { data: 'desc' } } },
+    });
+    
     if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
 
-    const analysis = await analyzeLeadWithGemini(lead?.lead || lead);
+    const analysis = await analyzeLeadWithGemini(lead);
+
+    // Formatar análise como texto para registrar na interação
+    const analysisText = `[ANÁLISE IA] 
+Diagnóstico: ${analysis.diagnostico}
+Serviço Recomendado: ${analysis.servicoRecomendado}
+Proposta: ${analysis.proposta}
+Abordagem: ${analysis.abordagem}
+Como Ser Convincente: ${analysis.comoSerConvincente}
+Prioridade: ${analysis.prioridade} - ${analysis.justificativaPrioridade}`;
+
+    // Registrar a análise como uma interação
+    await prisma.interacao.create({
+      data: {
+        leadId: req.params.id,
+        tipo: 'ia_analysis',
+        conteudo: analysisText,
+        data: new Date(),
+      },
+    });
 
     const updated = await prisma.lead.update({
       where: { id: req.params.id },

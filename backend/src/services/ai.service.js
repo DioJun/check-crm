@@ -1,9 +1,14 @@
 const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 async function analyzeLeadWithGemini(lead) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
+
+  // Formatar interações para o prompt
+  const interacoesTexto = lead.interacoes && lead.interacoes.length > 0
+    ? lead.interacoes.map((i) => `- ${new Date(i.data).toLocaleString('pt-BR')}: ${i.conteudo}`).join('\n')
+    : 'Nenhuma interação registrada';
 
   const prompt = `Você é um consultor de vendas especializado em vender sites, sistemas web, CRMs e softwares para pequenas e médias empresas brasileiras.
 
@@ -21,6 +26,9 @@ DADOS DO LEAD:
 - Número de avaliações: ${lead.reviews || 'Não informado'}
 - Origem: ${lead.origem || 'Não informada'}
 - Status: ${lead.status || 'novo'}
+
+HISTÓRICO DE INTERAÇÕES E ANOTAÇÕES:
+${interacoesTexto}
 
 Retorne este JSON exatamente (preencha todos os campos):
 {

@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronRight, X, MoreVertical } from 'lucide-react';
+import { ChevronRight, X, MoreVertical, Trash2, Eye } from 'lucide-react';
 import api from '../services/api';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
 
@@ -25,7 +25,7 @@ const COLUMNS = [
   { id: 'fechado', label: 'Fechado', color: 'bg-green-500', light: 'bg-green-50 border-green-200' },
 ];
 
-function LeadCard({ lead, isDragging = false, onMoveClick }) {
+function LeadCard({ lead, isDragging = false, onMoveClick, onDeleteClick, onViewClick }) {
   return (
     <div
       className={`bg-white rounded-lg border border-gray-200 p-3 shadow-sm ${
@@ -41,25 +41,50 @@ function LeadCard({ lead, isDragging = false, onMoveClick }) {
             <WhatsAppButton telefone={lead.telefone} nome={lead.nome} className="!py-1 !px-2 !text-xs" />
           </div>
         </div>
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Botão clicado, abrindo modal para:', lead.nome);
-            onMoveClick(lead);
-          }}
-          className="flex-shrink-0 p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600 pointer-events-auto z-10 relative"
-          title="Mover para outro status"
-          type="button"
-        >
-          <MoreVertical className="w-4 h-4" />
-        </button>
+        <div className="flex flex-col gap-1 flex-shrink-0">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onViewClick(lead);
+            }}
+            className="p-1 hover:bg-blue-50 rounded-lg transition-colors text-gray-400 hover:text-blue-600 pointer-events-auto z-10 relative"
+            title="Visualizar detalhes"
+            type="button"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDeleteClick(lead);
+            }}
+            className="p-1 hover:bg-red-50 rounded-lg transition-colors text-gray-400 hover:text-red-600 pointer-events-auto z-10 relative"
+            title="Deletar lead"
+            type="button"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onMoveClick(lead);
+            }}
+            className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600 pointer-events-auto z-10 relative"
+            title="Mover para outro status"
+            type="button"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function SortableCard({ lead, onMoveClick }) {
+function SortableCard({ lead, onMoveClick, onDeleteClick, onViewClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: lead.id,
   });
@@ -71,12 +96,12 @@ function SortableCard({ lead, onMoveClick }) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none">
-      <LeadCard lead={lead} isDragging={isDragging} onMoveClick={onMoveClick} />
+      <LeadCard lead={lead} isDragging={isDragging} onMoveClick={onMoveClick} onDeleteClick={onDeleteClick} onViewClick={onViewClick} />
     </div>
   );
 }
 
-function Column({ column, leads, onMoveClick }) {
+function Column({ column, leads, onMoveClick, onDeleteClick, onViewClick }) {
   const { setNodeRef } = useDroppable({
     id: column.id,
   });
@@ -96,7 +121,7 @@ function Column({ column, leads, onMoveClick }) {
         <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
             {leads.map((lead) => (
-              <SortableCard key={lead.id} lead={lead} onMoveClick={onMoveClick} />
+              <SortableCard key={lead.id} lead={lead} onMoveClick={onMoveClick} onDeleteClick={onDeleteClick} onViewClick={onViewClick} />
             ))}
           </div>
         </SortableContext>
@@ -111,7 +136,9 @@ export default function Pipeline() {
   const [activeId, setActiveId] = useState(null);
   const [error, setError] = useState('');
   const [selectedLead, setSelectedLead] = useState(null);
+  const [viewedLead, setViewedLead] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -159,6 +186,23 @@ export default function Pipeline() {
       );
     } finally {
       setUpdatingStatus(false);
+    }
+  }
+
+  async function handleDeleteLead(lead) {
+    if (!window.confirm(`Tem certeza que deseja deletar o lead "${lead.nome}"?`)) {
+      return;
+    }
+
+    setDeletingId(lead.id);
+    try {
+      await api.delete(`/leads/${lead.id}`);
+      setLeads((prev) => prev.filter((l) => l.id !== lead.id));
+      setError('');
+    } catch (err) {
+      setError(`Erro ao deletar lead: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -235,7 +279,7 @@ export default function Pipeline() {
           <div className="flex gap-4 min-w-max">
             {COLUMNS.map((col) => {
               const colLeads = leads.filter((l) => l.status === col.id);
-              return <Column key={col.id} column={col} leads={colLeads} onMoveClick={setSelectedLead} />;
+              return <Column key={col.id} column={col} leads={colLeads} onMoveClick={setSelectedLead} onDeleteClick={handleDeleteLead} onViewClick={setViewedLead} />;
             })}
           </div>
 
@@ -244,6 +288,77 @@ export default function Pipeline() {
           </DragOverlay>
         </DndContext>
       </div>
+
+      {/* View Lead Modal/Popup */}
+      {viewedLead && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-96 overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">{viewedLead.nome}</h2>
+              <button
+                onClick={() => setViewedLead(null)}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="px-6 py-4 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Telefone</p>
+                  <p className="text-sm text-gray-900">{viewedLead.telefone || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Cidade</p>
+                  <p className="text-sm text-gray-900">{viewedLead.cidade || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Serviço</p>
+                  <p className="text-sm text-gray-900">{viewedLead.servico || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Status</p>
+                  <p className="text-sm text-gray-900 capitalize">{viewedLead.status || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Origem</p>
+                  <p className="text-sm text-gray-900">{viewedLead.origem || '-'}</p>
+                </div>
+                {viewedLead.avaliacao && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Avaliação</p>
+                    <p className="text-sm text-yellow-600">⭐ {viewedLead.avaliacao}</p>
+                  </div>
+                )}
+              </div>
+              {viewedLead.site && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Site</p>
+                  <a href={viewedLead.site} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline">
+                    {viewedLead.site}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 px-6 py-4 flex gap-3">
+              <button
+                onClick={() => setViewedLead(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Fechar
+              </button>
+              <a
+                href={`/leads/${viewedLead.id}`}
+                className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors text-center"
+              >
+                Ver Completo
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Move Modal */}
       {selectedLead && (
