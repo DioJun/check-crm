@@ -99,13 +99,25 @@ async function analyzeWithAI(req, res) {
     const analysis = await analyzeLeadWithGemini(lead);
 
     // Formatar análise como texto para registrar na interação
-    const analysisText = `[ANÁLISE IA] 
-Diagnóstico: ${analysis.diagnostico}
-Serviço Recomendado: ${analysis.servicoRecomendado}
-Proposta: ${analysis.proposta}
-Abordagem: ${analysis.abordagem}
-Como Ser Convincente: ${analysis.comoSerConvincente}
-Prioridade: ${analysis.prioridade} - ${analysis.justificativaPrioridade}`;
+    // Escapar quebras de linha para evitar problemas de JSON
+    const sanitize = (str) => (str || '').replace(/\n/g, ' ').replace(/\r/g, ' ').trim();
+    
+    const analysisText = `[ANÁLISE IA]
+Diagnóstico: ${sanitize(analysis.diagnostico)}
+
+Serviço Recomendado: ${sanitize(analysis.servicoRecomendado)}
+
+Proposta: ${sanitize(analysis.proposta)}
+
+Abordagem: ${sanitize(analysis.abordagem)}
+
+Como Ser Convincente: ${sanitize(analysis.comoSerConvincente)}
+
+Pitch WhatsApp: ${sanitize(analysis.pitchWhatsApp)}
+
+Pitch Ligação: ${sanitize(analysis.pitchLigacao)}
+
+Prioridade: ${sanitize(analysis.prioridade)} - ${sanitize(analysis.justificativaPrioridade)}`;
 
     // Registrar a análise como uma interação
     await prisma.interacao.create({
