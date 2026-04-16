@@ -14,6 +14,8 @@ async function analyzeLeadWithGemini(lead) {
 
 Analise o lead abaixo e gere um relatório completo de estratégia de venda. Responda SOMENTE com um JSON válido, sem markdown, sem texto fora do JSON.
 
+IMPORTANTE: Se não houver histórico de interações, sua estratégia deve focar em uma abordagem CONSULTIVA e NATURAL, baseada apenas nos dados do negócio. Não force vendas - sugira como iniciar uma conversa genuína de descoberta.
+
 DADOS DO LEAD:
 - Nome/Empresa: ${lead.nome || 'Não informado'}
 - Telefone: ${lead.telefone || 'Não informado'}
@@ -32,15 +34,15 @@ ${interacoesTexto}
 
 Retorne este JSON exatamente (preencha todos os campos):
 {
-  "diagnostico": "Análise rápida do negócio, pontos fracos digitais e oportunidades identificadas (2-3 frases)",
-  "servicoRecomendado": "Qual serviço oferecer primeiro e por quê (ex: site profissional, sistema de agendamento, CRM, landing page, etc.)",
-  "proposta": "Proposta comercial concreta: o que entregar, benefícios diretos para o negócio dele, valor gerado (não mencione preço)",
-  "abordagem": "Estratégia de abordagem passo a passo: como iniciar o contato, o que dizer primeiro, como criar rapport, qual tom usar",
-  "comoSerConvincente": "Argumentos mais poderosos para essa empresa específica: dores que você resolve, resultados que pode mostrar, objeções comuns e como rebater",
-  "pitchWhatsApp": "Mensagem pronta para enviar no WhatsApp (máx 3 parágrafos, tom amigável e profissional, sem parecer spam, personalize com o nome e ramo)",
-  "pitchLigacao": "Script de abertura para ligação (primeiros 30 segundos, como se apresentar, como despertar interesse rápido)",
+  "diagnostico": "Análise rápida do negócio, pontos fracos digitais e oportunidades identificadas (2-3 frases). Baseie-se nos dados disponíveis.",
+  "servicoRecomendado": "Qual serviço poderia ser mais relevante para este tipo de negócio (ex: site profissional, sistema de agendamento, CRM, landing page, etc.) - enfoque em necessidade real, não em venda forçada",
+  "proposta": "Como abordar este lead de forma consultiva: qual problema potencial você poderia ajudar a resolver, baseado no ramo e presença digital atual",
+  "abordagem": "Estratégia de abordagem consultiva: como iniciar o contato de forma natural, o que perguntar primeiro para entender as necessidades reais dele, qual tom usar (profissional mas acessível)",
+  "comoSerConvincente": "Não sobre argumentos de venda, mas sobre como demonstrar valor: quais insights você pode compartilhar sobre seu mercado/ramo, problemas comuns em empresas como a dele, histórias de sucesso relevantes",
+  "pitchWhatsApp": "Mensagem CONSULTIVA para WhatsApp (máx 3 parágrafos, tom natural e amigável, pareça alguém do ramo conversando, personalize com nome/ramo, foque em CURIOSIDADE E VALOR, não em venda)",
+  "pitchLigacao": "Script de abertura para ligação (primeiros 30 segundos, como se apresentar de forma natural, foco em entender o negócio dele antes de oferecer qualquer coisa)",
   "prioridade": "alta | media | baixa",
-  "justificativaPrioridade": "Por que essa prioridade (1-2 frases)"
+  "justificativaPrioridade": "Por que essa prioridade baseado no perfil e potencial do negócio (1-2 frases)"
 }`;
 
   const body = {
