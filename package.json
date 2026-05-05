@@ -57,6 +57,10 @@
       {
         "from": "backend/package-lock.json",
         "to": "backend/package-lock.json"
+      },
+      {
+        "from": "backend/node_modules",
+        "to": "backend/node_modules"
       }
     ],
     "directories": {
