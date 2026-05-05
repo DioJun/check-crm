@@ -1,16 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader, AlertCircle, CheckCircle, X, Search, MapPin, Star, Building2 } from 'lucide-react';
 import api from '../../services/api';
 
 export default function GoogleMapsScraper({ onDataScraped, onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [mapsUrl, setMapsUrl] = useState('');
-  const [mode, setMode] = useState('search'); // 'search' atau 'url'
+  const [mode, setMode] = useState('search'); // 'search' ou 'url'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState([]);
   const [selectedResults, setSelectedResults] = useState(new Set());
   const [searchedTerm, setSearchedTerm] = useState('');
+  const [isElectron, setIsElectron] = useState(false);
+  const [checkingEnv, setCheckingEnv] = useState(true);
+
+  // Verificar se é Electron ao montar o componente
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await api.get('/config/environment');
+        setIsElectron(response.data.environment.isElectron);
+      } catch (err) {
+        console.error('Erro ao verificar ambiente:', err);
+        setIsElectron(false);
+      } finally {
+        setCheckingEnv(false);
+      }
+    })();
+  }, []);
 
   function handleSearch(e) {
     e.preventDefault();
@@ -341,7 +358,75 @@ export default function GoogleMapsScraper({ onDataScraped, onClose }) {
   }
 
   // Form inicial para busca
-  return (
+  // Se estiver verificando ambiente, mostrar loader
+  if (checkingEnv) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-md w-full p-6 text-center">
+          <Loader className="w-8 h-8 text-blue-600 mx-auto animate-spin" />
+          <p className="mt-3 text-gray-600">Verificando ambiente...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não for Electron, mostrar mensagem de não disponível
+  if (!isElectron) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-md w-full p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-gray-900">Google Maps Scraper</h2>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-6 h-6 flex-shrink-0 text-amber-600 mt-0.5" />
+              <div>
+                <p className="font-semibold text-amber-900 mb-2">Recurso disponível apenas na versão Desktop</p>
+                <p className="text-sm text-amber-800 mb-3">
+                  O Google Maps Scraper funciona apenas na versão Desktop (Electron) instalada no seu computador.
+                </p>
+                <p className="text-sm text-amber-700">
+                  Na versão Web, você pode importar dados através de:
+                </p>
+                <ul className="list-disc list-inside text-sm text-amber-700 mt-2 space-y-1">
+                  <li>Planilhas Excel ou CSV</li>
+                  <li>Importação manual de leads</li>
+                  <li>Integração com outras ferramentas</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+            >
+              Fechar
+            </button>
+            <a
+              href="https://check-crm.app/download"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-center"
+            >
+              Download Desktop
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Form inicial para busca (modo Desktop/Electron)
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <div className="flex items-center justify-between mb-6">

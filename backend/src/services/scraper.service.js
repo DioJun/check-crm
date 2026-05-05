@@ -4,6 +4,9 @@
  *
  * Puppeteer-extra + stealth para evasão de detecção
  * Scroll automático, User-Agent rotation, delays humanizados
+ * 
+ * ⚠️ IMPORTANTE: Este serviço FUNCIONA APENAS na versão Desktop (Electron)
+ *    Na versão Web (Vercel), o scraper é desabilitado automaticamente
  */
 
 const { URLSearchParams } = require('url');

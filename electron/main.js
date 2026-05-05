@@ -100,8 +100,10 @@ function ensureBackendEnv() {
     const jwtSecret = require('crypto').randomBytes(32).toString('hex');
 
     const envContent = [
+      `DATABASE_PROVIDER="sqlite"`,
       `DATABASE_URL="${databaseUrl}"`,
       `JWT_SECRET="${jwtSecret}"`,
+      `IS_ELECTRON="true"`,
       `PORT=3001`,
       `CORS_ORIGIN="http://localhost:5173,http://localhost:3001"`,
     ].join('\n');

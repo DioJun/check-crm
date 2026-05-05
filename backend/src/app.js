@@ -1,6 +1,10 @@
 require('dotenv').config();
+const { setupDatabase } = require('./lib/database');
 const express = require('express');
 const cors = require('cors');
+
+// Configurar banco de dados antes de importar modelos
+setupDatabase();
 
 const app = express();
 
@@ -59,6 +63,15 @@ try {
 } catch (err) {
   console.error('❌ Auth routes error:', err.message);
   console.error(err.stack);
+}
+
+// Try loading config routes
+try {
+  const configRoutes = require('./routes/config.routes');
+  app.use('/api/config', configRoutes);
+  console.log('✅ Config routes loaded at /api/config');
+} catch (err) {
+  console.error('❌ Config routes error:', err.message);
 }
 
 // Try loading lead routes
