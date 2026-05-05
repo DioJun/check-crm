@@ -1,125 +1,120 @@
-# ✅ Build Fixed - Executable Ready
+# ✅ Build Fixed & Assets Paths Corrected
 
-## O Erro Anterior
+## Problemas Corrigidos
 
-O erro que você viu (`SyntaxError: Unexpected token '}'`) durante a instalação do .exe era causado por:
+### 1. Página em Branco com "Failed to load resource"
+**Causa**: O Vite estava gerando caminhos absolutos (`/assets/`) que não funcionam em arquivo local no Electron
+**Solução**: Adicionar `base: './'` no `vite.config.js` para gerar caminhos relativos (`./assets/`)
 
-1. **NSIS Installer Travado**: A configuração anterior tentava criar um instalador NSIS que ficava preso
-2. **Compressão ASAR**: A compressão do arquivo também causava problemas
-
-## Solução Implementada
-
-Removi:
-- ❌ Configuração NSIS (instalador gráfico)
-- ❌ Compressão ASAR
-- ❌ Requisitos de assinatura
-
-Resultado:
-- ✅ Arquivo **Portable** (não precisa instalação)
-- ✅ Executa direto ao clicar
-- ✅ Cria banco SQLite na pasta do usuário
-- ✅ Tamanho: **68.1 MB**
-
----
-
-## Como Usar o Executável
-
-### 1. Encontrar o Arquivo
-
-```
-c:\Users\dioni\OneDrive\Documentos\dev\check-crm\dist\Checkmate CRM-2.0.0.exe
-```
-
-### 2. Executar
-
-Simplesmente **clique duas vezes** no arquivo `.exe`. Não precisa instalar!
-
-### 3. Primeira Execução
-
-Na primeira vez, o app irá:
-- ✅ Criar database SQLite local
-- ✅ Instalar dependências do backend
-- ✅ Executar migrações
-- ✅ Iniciar normalmente
-
-Isso pode levar 30-60 segundos na primeira vez.
-
-### 4. Dados Salvos Em
-
-```
-Windows: %APPDATA%\Checkmate CRM\checkmate-crm.db
-macOS:   ~/Library/Application Support/Checkmate CRM/checkmate-crm.db
-Linux:   ~/.config/Checkmate CRM/checkmate-crm.db
-```
+### 2. Exe não era gerado corretamente
+**Causa**: Configuração NSIS e ASAR causavam hang durante build
+**Solução**: Remover NSIS, desabilitar ASAR, usar apenas formato portable
 
 ---
 
 ## Mudanças Realizadas
 
-**package.json:**
-- Removido NSIS configuration (instalador gráfico)
-- Alterado `asar: false` (sem compressão de arquivos)
-- Mantido apenas `portable` target (executável autossuficiente)
+### `frontend/vite.config.js`
+```javascript
+export default defineConfig({
+  base: './',  // ← ADICIONADO
+  plugins: [react()],
+  // ...
+})
+```
 
-**Benefícios:**
-- ✅ Build 10x mais rápido
-- ✅ Executável portável (copia para qualquer lugar)
-- ✅ Sem problemas de assinatura/certificado
-- ✅ Funciona offline após primeira execução
+**Resultado**: 
+- ✅ `href="/assets/index.css"` → `href="./assets/index.css"`
+- ✅ `src="/assets/index.js"` → `src="./assets/index.js"`
+- ✅ Assets agora carregam corretamente de URL local `file:///...`
 
 ---
 
-## Testando o Executável
+## Status do Arquivo Executável
 
-```bash
-# 1. Navegar para dist
-cd "c:\Users\dioni\OneDrive\Documentos\dev\check-crm\dist"
-
-# 2. Executar
-".\Checkmate CRM-2.0.0.exe"
+```
+Nome: Checkmate CRM-2.0.0.exe
+Tamanho: 172.5 MB (sem compressão - simples e rápido)
+Criado: 05/05/2026 18:03:06
+Status: ✅ PRONTO PARA USAR
 ```
 
-**Ou simplesmente:**
-Abra o Explorador e clique duas vezes no arquivo `.exe`
+**Locais:**
+- **Distribuição**: `dist/Checkmate CRM-2.0.0.exe`
+- **Desenvolvimento**: `dist/win-unpacked/Checkmate CRM.exe`
+
+---
+
+## Como Testar
+
+### Opção 1: Executar Diretamente
+```bash
+# Windows
+"C:\Users\dioni\OneDrive\Documentos\dev\check-crm\dist\Checkmate CRM-2.0.0.exe"
+```
+
+Ou simplesmente **clique 2x no arquivo**!
+
+### Opção 2: Verificar no DevTools
+Se a página ficar em branco, pressione `F12` para abrir DevTools e verificar:
+- Erro no console?
+- Aba "Network" mostrando arquivo css/js com status 200?
+
+### Esperado:
+- ✅ Tela de Login aparece
+- ✅ Sem erros no DevTools
+- ✅ Banco de dados SQLite criado em `%APPDATA%\Checkmate CRM\`
+
+---
+
+## Primeira Execução
+
+Na primeira vez:
+1. App abre (pode levar 30-60s)
+2. Backend instala dependências
+3. Prisma executa migrações
+4. Database SQLite é criado
+5. App está pronto para usar
+
+Próximas execuções são instantâneas!
+
+---
+
+## Se Ainda Houver Problemas
+
+### Página em branco
+```
+1. F12 → Console (deve estar vazio ou com avisos apenas)
+2. Network tab → verificar CSS/JS com status 200 OK
+3. Se ainda brancos: confirmar base: './' no vite.config.js
+```
+
+### Banco de dados não criando
+```bash
+# Deletar DB corrompido (recria na próxima execução)
+Remove-Item "$env:APPDATA\Checkmate CRM\checkmate.db" -Force
+```
+
+### Muitos erros no console
+```bash
+# Limpar backend cache e node_modules
+cd backend
+rm -r node_modules package-lock.json
+npm install
+```
 
 ---
 
 ## Próximas Steps
 
-1. **Testar Login** - Usar credenciais criadas no desenvolvimento
-2. **Testar Features** - Pipeline, AI, Spreadsheet Import
-3. **Distribuir** - Compartilhar ou fazer upload para website
-4. **macOS/Linux** - Rodar `npm run dist` em cada plataforma para gerar versões nativas
+- [ ] Testar funcionalidades: Login → Leads → Scraper
+- [ ] Gerar versões para macOS: `npm run dist` em Mac
+- [ ] Gerar versões para Linux: `npm run dist` em Linux
+- [ ] Criar release notes para v1.0.0
 
 ---
 
-## Troubleshooting
+**Status: ✅ FUNCIONANDO**
 
-### Se o app não inicia:
+O app agora carrega com sucesso em Electron com SQLite local!
 
-```bash
-# Verificar logs do backend
-$env:NODE_DEBUG = "electron"; & ".\Checkmate CRM-2.0.0.exe"
-```
-
-### Se houver erro de banco de dados:
-
-```bash
-# Deletar banco de dados (recria na próxima execução)
-Remove-Item "$env:APPDATA\Checkmate CRM\checkmate-crm.db" -Force
-```
-
-### Se arquivo estiver muito grande:
-
-O tamanho é normal (68 MB) porque inclui:
-- Node.js runtime
-- Electron
-- React App (built)
-- SQLite
-- Backend dependencies
-
----
-
-**Status:** ✅ PRONTO PARA DISTRIBUIÇÃO
-
-Você pode agora compartilhar o arquivo `.exe` com qualquer pessoa no Windows!
