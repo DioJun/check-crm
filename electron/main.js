@@ -80,26 +80,24 @@ function ensureBackendEnv() {
   console.log('[Env] Backend dir:', backendDir);
   console.log('[Env] Env file path:', envPath);
 
+  // Sempre garantir que IS_ELECTRON está no .env (mesmo que arquivo exista)
+  let envContent;
+  
   if (!fs.existsSync(envPath)) {
-    // Em produção, colocar o DB no diretório de dados do usuário
+    // Criar novo .env com todas as variáveis
     const userDataPath = app.getPath('userData');
     const dbFile = path.join(userDataPath, 'checkmate.db');
     
-    // SQLite URL format: file:///C:/path/to/file.db (3 slashes para absolute path no Windows)
-    // ou file:/C:/path/to/file.db (1 slash, Prisma interpreta corretamente)
     let databaseUrl;
     if (process.platform === 'win32') {
-      // Windows: file:/C:/Users/.../checkmate.db
       databaseUrl = `file:${dbFile.replace(/\\/g, '/')}`;
     } else {
-      // Unix: file:///home/.../checkmate.db
       databaseUrl = `file:${dbFile}`;
     }
     
-    // Generate JWT_SECRET once and persist it
     const jwtSecret = require('crypto').randomBytes(32).toString('hex');
 
-    const envContent = [
+    envContent = [
       `DATABASE_PROVIDER="sqlite"`,
       `DATABASE_URL="${databaseUrl}"`,
       `JWT_SECRET="${jwtSecret}"`,
@@ -110,21 +108,37 @@ function ensureBackendEnv() {
 
     fs.writeFileSync(envPath, envContent, 'utf-8');
     console.log('[Env] ✓ .env criado em:', envPath);
-    console.log('[Env] ✓ DATABASE_URL:', databaseUrl);
-    console.log('[Env] ✓ Database file:', dbFile);
-    console.log('[Env] Verificando arquivo criado...');
-    const created = fs.existsSync(envPath);
-    console.log('[Env] Arquivo .env existe?', created);
-    if (created) {
-      const content = fs.readFileSync(envPath, 'utf-8');
-      console.log('[Env] Conteúdo (primeiras linhas):', content.split('\n')[0]);
-    }
   } else {
-    console.log('[Env] .env já existe, usando valores persistidos');
-    const content = fs.readFileSync(envPath, 'utf-8');
-    const databaseUrl = content.split('\n')[0];
-    console.log('[Env] DATABASE_URL:', databaseUrl);
+    // Arquivo existe - ler, atualizar IS_ELECTRON, e reescrever
+    console.log('[Env] .env já existe, atualizando IS_ELECTRON...');
+    envContent = fs.readFileSync(envPath, 'utf-8');
+    
+    // Se não tiver IS_ELECTRON, adicionar. Se tiver, atualizar
+    const lines = envContent.split('\n');
+    const hasIsElectron = lines.some(line => line.startsWith('IS_ELECTRON='));
+    
+    if (hasIsElectron) {
+      // Substituir linha existente
+      envContent = lines
+        .map(line => line.startsWith('IS_ELECTRON=') ? 'IS_ELECTRON="true"' : line)
+        .join('\n');
+    } else {
+      // Adicionar nova linha
+      envContent += '\nIS_ELECTRON="true"';
+    }
+    
+    fs.writeFileSync(envPath, envContent, 'utf-8');
+    console.log('[Env] ✓ IS_ELECTRON atualizado para true');
   }
+  
+  // Sempre log o resultado final
+  const finalContent = fs.readFileSync(envPath, 'utf-8');
+  console.log('[Env] .env conteúdo final:');
+  finalContent.split('\n').forEach(line => {
+    if (line.includes('DATABASE') || line.includes('ELECTRON') || line.includes('PORT')) {
+      console.log('[Env]   ' + line);
+    }
+  });
   console.log('[Env] ============================================\n');
 }
 
