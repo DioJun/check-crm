@@ -13,7 +13,7 @@
     "dev:electron": "npx wait-on http://localhost:5173 && electron .",
     "dev:all": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\" \"npx wait-on http://localhost:5173 && electron .\"",
     "build": "cd frontend && npm run build",
-    "build:electron": "electron-builder build --publish never",
+    "build:electron": "electron-builder build --publish never && node scripts/postbuild.js",
     "dist": "npm run build && npm run build:electron",
     "start": "electron ."
   },
@@ -38,29 +38,8 @@
     ],
     "extraResources": [
       {
-        "from": "assets/",
-        "to": "assets/",
-        "filter": ["**/*"]
-      },
-      {
-        "from": "backend/src",
-        "to": "backend/src"
-      },
-      {
-        "from": "backend/prisma",
-        "to": "backend/prisma"
-      },
-      {
-        "from": "backend/package.json",
-        "to": "backend/package.json"
-      },
-      {
-        "from": "backend/package-lock.json",
-        "to": "backend/package-lock.json"
-      },
-      {
-        "from": "backend/node_modules",
-        "to": "backend/node_modules"
+        "from": "assets",
+        "to": "assets"
       }
     ],
     "directories": {

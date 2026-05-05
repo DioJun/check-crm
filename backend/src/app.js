@@ -98,6 +98,15 @@ try {
   console.error('Interaction routes error:', err.message);
 }
 
+// Try loading API v1 routes (com autenticação por API Key)
+try {
+  const apiV1Routes = require('./routes/api-v1.routes');
+  app.use('/api/v1', apiV1Routes);
+  console.log('✅ API v1 routes loaded at /api/v1');
+} catch (err) {
+  console.error('❌ API v1 routes error:', err.message);
+}
+
 // Try loading scraper routes
 try {
   const scraperRoutes = require('./routes/scraper.routes');
