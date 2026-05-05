@@ -74,12 +74,6 @@
       "legalTrademarks": "Checkmate CRM",
       "artifactName": "${productName}-${version}.exe"
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    },
-    "asar": true
+    "asar": false
   }
 }
