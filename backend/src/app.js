@@ -3,6 +3,14 @@ const { setupDatabase } = require('./lib/database');
 const express = require('express');
 const cors = require('cors');
 
+// Log de ambiente
+console.log('\n[Bootstrap] ============================================');
+console.log('[Bootstrap] Iniciando backend...');
+console.log('[Bootstrap] IS_ELECTRON:', process.env.IS_ELECTRON);
+console.log('[Bootstrap] NODE_ENV:', process.env.NODE_ENV);
+console.log('[Bootstrap] DATABASE_PROVIDER:', process.env.DATABASE_PROVIDER);
+console.log('[Bootstrap] ============================================\n');
+
 // Configurar banco de dados antes de importar modelos
 setupDatabase();
 

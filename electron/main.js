@@ -361,12 +361,14 @@ async function startBackend() {
     console.log(`[Backend] Entry: ${backendEntry}`);
     console.log(`[Backend] CWD: ${backendDir}`);
     console.log(`[Backend] NODE_ENV: production`);
+    console.log(`[Backend] IS_ELECTRON: true`);
     
     backendProcess = fork(backendEntry, [], {
       cwd: backendDir,
       env: {
         ...process.env,
         NODE_ENV: 'production',
+        IS_ELECTRON: 'true',
       },
       stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
     });
@@ -409,6 +411,10 @@ app.on('ready', async () => {
   console.log('Environment:', isDev ? 'DEVELOPMENT' : 'PRODUCTION');
   console.log('Backend path:', getBackendPath());
   console.log('='.repeat(60) + '\n');
+  
+  // ⚠️ IMPORTANTE: Setar IS_ELECTRON ANTES de iniciar backend
+  process.env.IS_ELECTRON = 'true';
+  console.log('[Electron] IS_ELECTRON setado como true no processo principal');
   
   // Iniciar backend (ou verificar se já está rodando)
   await startBackend();

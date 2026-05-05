@@ -13,6 +13,11 @@ class ConfigController {
     const isProd = process.env.NODE_ENV === 'production';
     const dbProvider = process.env.DATABASE_PROVIDER || 'postgresql';
 
+    console.log('[ConfigController] Environment check:');
+    console.log('[ConfigController]   IS_ELECTRON env var:', process.env.IS_ELECTRON);
+    console.log('[ConfigController]   isElectron boolean:', isElectron);
+    console.log('[ConfigController]   GoogleMaps Scraper enabled:', isElectron);
+
     return res.json({
       success: true,
       environment: {
