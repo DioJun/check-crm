@@ -401,8 +401,6 @@ async function startBackend() {
     console.log('[Backend] ✓ Backend respondendo normalmente');
   }
   console.log('[Backend] ============================================\n');
-    console.log('[Backend] ✅ Backend online e pronto!');
-  }
 }
 
 app.on('ready', async () => {
