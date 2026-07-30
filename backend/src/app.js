@@ -16,28 +16,9 @@ setupDatabase();
 
 const app = express();
 
-// Configurar CORS
+// Configurar CORS (ambiente local - aceitar tudo)
 app.use(cors({
-  origin: function (origin, callback) {
-    // Em desenvolvimento, aceitar localhost
-    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
-      return callback(null, true);
-    }
-    
-    // Em produção, aceitar qualquer vercel.app
-    if (origin && origin.includes('vercel.app')) {
-      return callback(null, true);
-    }
-    
-    // Aceitar origens configuradas via ENV
-    const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    console.warn('[CORS] Bloqueado:', origin);
-    callback(new Error('Not allowed by CORS'));
-  },
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']

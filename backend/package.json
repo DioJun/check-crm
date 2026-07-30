@@ -9,9 +9,7 @@
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "node prisma/seed.js",
-    "vercel-build": "prisma generate"
+    "db:migrate": "prisma migrate dev"
   },
   "dependencies": {
     "@prisma/client": "^5.10.2",

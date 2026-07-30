@@ -57,7 +57,7 @@ export default function LeadModal({ lead, onClose, onSuccess }) {
     }
   }
 
-  const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent';
+  const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent';
   const labelClass = 'block text-xs font-medium text-gray-700 mb-1';
 
   return (
@@ -129,7 +129,7 @@ export default function LeadModal({ lead, onClose, onSuccess }) {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-medium text-sm rounded-lg transition-colors"
+              className="flex-1 py-2 px-4 bg-gold-700 hover:bg-gold-500 disabled:bg-gold-400 text-dark-900 font-medium text-sm rounded-lg transition-colors"
             >
               {loading ? 'Salvando...' : isEdit ? 'Salvar' : 'Criar Lead'}
             </button>

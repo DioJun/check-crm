@@ -1,18 +1,13 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, session, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { spawn, fork } = require('child_process');
+const { spawn } = require('child_process');
 const fs = require('fs');
-
-// Detectar ambiente de desenvolvimento
-const isDev = !app.isPackaged;
 
 let mainWindow;
 let backendProcess;
 
-// Em produção, backend fica em extraResources (fora do asar)
 function getBackendPath() {
-  if (isDev) return path.join(__dirname, '..', 'backend');
-  return path.join(process.resourcesPath, 'backend');
+  return path.join(__dirname, '..', 'backend');
 }
 
 function createWindow() {
@@ -31,26 +26,22 @@ function createWindow() {
     },
   });
 
-  // Em desenvolvimento: carregar localhost React
-  // Em produção: carregar build estático (loadFile resolve asar automaticamente)
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-  } else {
-    // __dirname em prod = resources/app.asar/electron/, logo ../frontend/dist/ resolve dentro do asar
-    const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
-    console.log(`Loading file: ${indexPath}`);
-    mainWindow.loadFile(indexPath);
-  }
-  
-  // Abrir devtools se houver erro ou estiver em dev
-  if (isDev) {
-    mainWindow.webContents.openDevTools();
-  } else {
-    // Em produção, abrir devtools também para debug
-    mainWindow.webContents.openDevTools();
-  }
+  // Configurar CSP para evitar warning de segurança
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:3001 ws://localhost:5173; font-src 'self' data:;"
+        ]
+      }
+    });
+  });
 
-  // Log quando página falhar ao carregar
+  // Carregar frontend do Vite dev server
+  mainWindow.loadURL('http://localhost:5173');
+  mainWindow.webContents.openDevTools();
+
   mainWindow.webContents.on('crashed', () => {
     console.error('[ERROR] Renderer process crashed!');
   });
@@ -59,87 +50,9 @@ function createWindow() {
     console.error('[ERROR] Failed to load page');
   });
 
-  mainWindow.webContents.on('did-fail-preliminary-load', (event, errorCode, errorDescription) => {
-    console.error(`[ERROR] Preliminary load failed: ${errorCode} - ${errorDescription}`);
-  });
-
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-}
-
-/**
- * Garantir que o .env existe no backend (para produção).
- * Se não existir, cria com valores padrão usando userData como DB path.
- */
-function ensureBackendEnv() {
-  const backendDir = getBackendPath();
-  const envPath = path.join(backendDir, '.env');
-
-  console.log('[Env] ============================================');
-  console.log('[Env] Backend dir:', backendDir);
-  console.log('[Env] Env file path:', envPath);
-
-  // Sempre garantir que IS_ELECTRON está no .env (mesmo que arquivo exista)
-  let envContent;
-  
-  if (!fs.existsSync(envPath)) {
-    // Criar novo .env com todas as variáveis
-    const userDataPath = app.getPath('userData');
-    const dbFile = path.join(userDataPath, 'checkmate.db');
-    
-    let databaseUrl;
-    if (process.platform === 'win32') {
-      databaseUrl = `file:${dbFile.replace(/\\/g, '/')}`;
-    } else {
-      databaseUrl = `file:${dbFile}`;
-    }
-    
-    const jwtSecret = require('crypto').randomBytes(32).toString('hex');
-
-    envContent = [
-      `DATABASE_PROVIDER="sqlite"`,
-      `DATABASE_URL="${databaseUrl}"`,
-      `JWT_SECRET="${jwtSecret}"`,
-      `IS_ELECTRON="true"`,
-      `PORT=3001`,
-      `CORS_ORIGIN="http://localhost:5173,http://localhost:3001"`,
-    ].join('\n');
-
-    fs.writeFileSync(envPath, envContent, 'utf-8');
-    console.log('[Env] ✓ .env criado em:', envPath);
-  } else {
-    // Arquivo existe - ler, atualizar IS_ELECTRON, e reescrever
-    console.log('[Env] .env já existe, atualizando IS_ELECTRON...');
-    envContent = fs.readFileSync(envPath, 'utf-8');
-    
-    // Se não tiver IS_ELECTRON, adicionar. Se tiver, atualizar
-    const lines = envContent.split('\n');
-    const hasIsElectron = lines.some(line => line.startsWith('IS_ELECTRON='));
-    
-    if (hasIsElectron) {
-      // Substituir linha existente
-      envContent = lines
-        .map(line => line.startsWith('IS_ELECTRON=') ? 'IS_ELECTRON="true"' : line)
-        .join('\n');
-    } else {
-      // Adicionar nova linha
-      envContent += '\nIS_ELECTRON="true"';
-    }
-    
-    fs.writeFileSync(envPath, envContent, 'utf-8');
-    console.log('[Env] ✓ IS_ELECTRON atualizado para true');
-  }
-  
-  // Sempre log o resultado final
-  const finalContent = fs.readFileSync(envPath, 'utf-8');
-  console.log('[Env] .env conteúdo final:');
-  finalContent.split('\n').forEach(line => {
-    if (line.includes('DATABASE') || line.includes('ELECTRON') || line.includes('PORT')) {
-      console.log('[Env]   ' + line);
-    }
-  });
-  console.log('[Env] ============================================\n');
 }
 
 /** Verificar se backend já está rodando na porta 3001 */
@@ -151,152 +64,6 @@ function checkBackendRunning() {
     });
     req.on('error', () => resolve(false));
     req.setTimeout(1500, () => { req.destroy(); resolve(false); });
-  });
-}
-
-/** Garantir que as dependências do backend estão instaladas */
-async function ensureBackendDeps() {
-  const backendDir = getBackendPath();
-  const nodeModulesPath = path.join(backendDir, 'node_modules');
-  const packagePath = path.join(backendDir, 'package.json');
-
-  // Verificar se package.json existe
-  if (!fs.existsSync(packagePath)) {
-    console.error('[Backend] package.json não encontrado em:', packagePath);
-    return false;
-  }
-
-  // Se node_modules já existe e tem pacotes principais, ok
-  if (fs.existsSync(nodeModulesPath)) {
-    const expressPath = path.join(nodeModulesPath, 'express');
-    const prismaPath = path.join(nodeModulesPath, '.prisma');
-    if (fs.existsSync(expressPath)) {
-      console.log('[Backend] ✓ node_modules encontrado com dependências');
-      return true;
-    }
-  }
-
-  // Instalar dependências
-  console.log('[Backend] 📦 Instalando dependências do backend...');
-  console.log('[Backend] Diretório:', backendDir);
-
-  return new Promise((resolve) => {
-    // Usar npm.cmd no Windows
-    const cmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    const npm = spawn(cmd, ['install', '--production', '--verbose'], {
-      cwd: backendDir,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: true,
-    });
-
-    let stdoutData = '';
-    let stderrData = '';
-
-    if (npm.stdout) {
-      npm.stdout.on('data', (data) => {
-        const str = data.toString();
-        stdoutData += str;
-        // Log apenas linhas importantes
-        if (str.includes('added') || str.includes('up to date') || str.includes('packages')) {
-          console.log('[npm]', str.trim());
-        }
-      });
-    }
-
-    if (npm.stderr) {
-      npm.stderr.on('data', (data) => {
-        const str = data.toString();
-        stderrData += str;
-        if (str.includes('ERR!') || str.includes('error')) {
-          console.error('[npm ERR]', str.trim());
-        }
-      });
-    }
-
-    npm.on('error', (error) => {
-      console.error('[Backend] Erro ao executar npm:', error.message);
-      console.error('[Backend] Verifique se Node.js está instalado: https://nodejs.org/');
-      resolve(false);
-    });
-
-    npm.on('close', (code) => {
-      if (code === 0) {
-        console.log('[Backend] ✓ Dependências instaladas com sucesso');
-        resolve(true);
-      } else {
-        console.error(`[Backend] ✗ npm install falhou (código ${code})`);
-        if (stderrData) console.error('[Backend] Detalhes:', stderrData);
-        // Mesmo com erro, deixa tentar usar (pode estar parcialmente instalado)
-        resolve(false);
-      }
-    });
-  });
-}
-
-/** Run database migrations in production */
-async function runDatabaseMigrations() {
-  if (isDev) {
-    console.log('[Database] DEV MODE - Pulando migrações');
-    return true;
-  }
-  
-  const backendDir = getBackendPath();
-  console.log('[Database] ============================================');
-  console.log('[Database] Migrações do Banco de Dados');
-  console.log('[Database] Backend dir:', backendDir);
-  console.log('[Database] ============================================');
-  
-  return new Promise((resolve) => {
-    const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-    
-    console.log('[Database] Executando: npx prisma migrate deploy');
-    const migrate = spawn(cmd, ['prisma', 'migrate', 'deploy'], {
-      cwd: backendDir,
-      stdio: 'pipe',
-      shell: true,
-      env: process.env,
-    });
-
-    let fullOutput = '';
-    let errorOutput = '';
-    
-    if (migrate.stdout) {
-      migrate.stdout.on('data', (data) => {
-        const msg = data.toString();
-        fullOutput += msg;
-        console.log('[Prisma]', msg.trim());
-      });
-    }
-    
-    if (migrate.stderr) {
-      migrate.stderr.on('data', (data) => {
-        const msg = data.toString();
-        errorOutput += msg;
-        console.error('[Prisma ERR]', msg.trim());
-      });
-    }
-
-    migrate.on('close', (code) => {
-      console.log('[Database] Process exited with code:', code);
-      
-      if (code === 0 || code === null) {
-        console.log('[Database] ✓ Migrações aplicadas com sucesso');
-        console.log('[Database] ============================================\n');
-        resolve(true);
-      } else {
-        console.error('[Database] ✗ Erro na migração (código ' + code + ')');
-        console.error('[Database] STDOUT:', fullOutput);
-        console.error('[Database] STDERR:', errorOutput);
-        console.log('[Database] ============================================\n');
-        resolve(false);
-      }
-    });
-
-    migrate.on('error', (err) => {
-      console.error('[Database] Erro ao executar spawn:', err.message);
-      console.log('[Database] ============================================\n');
-      resolve(false);
-    });
   });
 }
 
@@ -336,67 +103,14 @@ async function startBackend() {
     return;
   }
 
-  console.log('[Backend] ============================================');
-  console.log('[Backend] Iniciando sequência de startup...');
-  
-  console.log('[Backend] STEP 1: Configurando variáveis de ambiente...');
-  ensureBackendEnv();
-
   const backendDir = getBackendPath();
-  const backendEntry = path.join(backendDir, 'src', 'app.js');
-
-  // Em produção, garantir que as dependências estão instaladas
-  if (!isDev) {
-    console.log('[Backend] STEP 2: Verificando dependências...');
-    const depSuccess = await ensureBackendDeps();
-    if (!depSuccess) {
-      console.warn('[Backend] ⚠️ npm install retornou erro, tentando mesmo assim...');
-    }
-    
-    // Run database migrations
-    console.log('[Backend] STEP 3: Executando migrações do banco de dados...');
-    const migSuccess = await runDatabaseMigrations();
-    if (!migSuccess) {
-      console.warn('[Backend] ⚠️ Migração retornou erro, continuando...');
-    }
-  }
-
-  if (isDev) {
-    // Dev: usar spawn com npm run dev (nodemon)
-    console.log('[Backend] STEP 4: Iniciando backend (dev mode)...');
-    backendProcess = spawn('npm', ['run', 'dev'], {
-      cwd: backendDir,
-      stdio: 'inherit',
-      shell: true,
-    });
-  } else {
-    // Produção: fork direto do app.js
-    console.log(`[Backend] STEP 4: Iniciando backend (production mode)...`);
-    console.log(`[Backend] Entry: ${backendEntry}`);
-    console.log(`[Backend] CWD: ${backendDir}`);
-    console.log(`[Backend] NODE_ENV: production`);
-    console.log(`[Backend] IS_ELECTRON: true`);
-    
-    backendProcess = fork(backendEntry, [], {
-      cwd: backendDir,
-      env: {
-        ...process.env,
-        NODE_ENV: 'production',
-        IS_ELECTRON: 'true',
-      },
-      stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-    });
-
-    backendProcess.stdout?.on('data', (d) => {
-      const msg = d.toString().trim();
-      if (msg) console.log(`[backend:out] ${msg}`);
-    });
-    
-    backendProcess.stderr?.on('data', (d) => {
-      const msg = d.toString().trim();
-      if (msg) console.error(`[backend:err] ${msg}`);
-    });
-  }
+  
+  console.log('[Backend] Iniciando backend com nodemon...');
+  backendProcess = spawn('npm', ['run', 'dev'], {
+    cwd: backendDir,
+    stdio: 'inherit',
+    shell: true,
+  });
 
   backendProcess.on('error', (err) => {
     console.error('[Backend] Erro ao iniciar processo:', err.message);
@@ -407,30 +121,24 @@ async function startBackend() {
     backendProcess = null;
   });
 
-  // Aguardar backend ficar pronto (importante: aguarde ANTES de criar window)
-  console.log('[Backend] STEP 5: Aguardando backend responder...');
+  // Aguardar backend ficar pronto
+  console.log('[Backend] Aguardando backend responder...');
   const ready = await waitForBackend();
   if (!ready) {
     console.warn('[Backend] ⚠️ Backend não respondeu após 30s. Continuando mesmo assim...');
-    console.warn('[Backend] Verifique se há erros acima. Pode precisar instalar Node.js.');
   } else {
     console.log('[Backend] ✓ Backend respondendo normalmente');
   }
-  console.log('[Backend] ============================================\n');
 }
 
 app.on('ready', async () => {
   console.log('\n' + '='.repeat(60));
-  console.log('🚀 Electron app iniciando...');
-  console.log('Environment:', isDev ? 'DEVELOPMENT' : 'PRODUCTION');
-  console.log('Backend path:', getBackendPath());
+  console.log('🚀 Checkmate CRM - Desktop');
   console.log('='.repeat(60) + '\n');
   
-  // ⚠️ IMPORTANTE: Setar IS_ELECTRON ANTES de iniciar backend
   process.env.IS_ELECTRON = 'true';
-  console.log('[Electron] IS_ELECTRON setado como true no processo principal');
   
-  // Iniciar backend (ou verificar se já está rodando)
+  // Iniciar backend
   await startBackend();
   
   // Criar janela principal

@@ -253,7 +253,7 @@ export default function Pipeline() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-700" />
       </div>
     );
   }
@@ -338,7 +338,7 @@ export default function Pipeline() {
               {viewedLead.site && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Site</p>
-                  <a href={viewedLead.site} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline">
+                  <a href={viewedLead.site} target="_blank" rel="noopener noreferrer" className="text-sm text-gold-700 hover:text-gold-600 hover:underline">
                     {viewedLead.site}
                   </a>
                 </div>
@@ -357,7 +357,7 @@ export default function Pipeline() {
                   setViewedLead(null);
                   navigate(`/leads/${viewedLead.id}`);
                 }}
-                className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors text-center"
+                className="flex-1 px-4 py-2 bg-gold-700 hover:bg-gold-500 text-dark-900 font-medium rounded-lg transition-colors text-center"
               >
                 Ver Completo
               </button>

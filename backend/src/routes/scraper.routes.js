@@ -1,9 +1,6 @@
 /**
  * Rotas de Scraping
  * POST /scraper/* endpoints
- * 
- * ⚠️ IMPORTANTE: Google Maps Scraper está disponível APENAS na versão Desktop (Electron)
- * Na versão Web (Vercel), todas as rotas de scraper retornam 403 Forbidden
  */
 
 const express = require('express');

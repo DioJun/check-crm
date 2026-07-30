@@ -25,10 +25,10 @@ async function login(req, res) {
     console.error('[Auth Login Error]', err);
     
     // Se for erro de banco de dados, tentar diagnosticar
-    if (err.message && err.message.includes('FATAL')) {
+    if (err.message && (err.message.includes('FATAL') || err.message.includes('SQLITE'))) {
       return res.status(500).json({ 
         error: 'Erro ao conectar ao banco de dados',
-        details: 'DATABASE_URL ou DIRECT_URL não configurados?' 
+        details: 'Verifique se o banco SQLite foi criado corretamente' 
       });
     }
     

@@ -34,13 +34,18 @@ function mapScraperDataToSchema(lead) {
     cidade: lead.cidade?.trim() || null,
     servico: lead.servico?.trim() || null,
     origem: lead.origem || 'Google Maps Scraper',
-    // IMPORTANTE: Mapear 'avaliacoes' → 'avaliacao' (singular)
     avaliacao: lead.avaliacoes?.trim() || lead.avaliacao?.trim() || null,
     temWhatsapp: lead.temWhatsapp || false,
     temSite: lead.temSite || false,
     site: lead.site?.trim() || null,
-    // Se tem endereço enriquecido, guardar em reviews
     reviews: lead.endereco?.trim() || null,
+    googleMapsRating: lead.googleMapsRating || null,
+    hasProduct: lead.hasProduct || false,
+    instagram: lead.instagram || null,
+    instagramQuality: lead.instagramQuality || null,
+    observacoes: lead.observacoes || null,
+    porte: lead.porte || null,
+    tempoMercado: lead.tempoMercado || null,
   };
 }
 

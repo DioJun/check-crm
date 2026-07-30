@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MessageSquare, Phone, StickyNote, ExternalLink, Edit2, Check, X, Sparkles, RefreshCw, Copy } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Phone, StickyNote, ExternalLink, Edit2, Check, X, Sparkles, RefreshCw, Copy, Bot, MessageCircle, Lightbulb, Clock, Target, BarChart, ChevronDown } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/ui/StatusBadge';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
@@ -41,6 +41,13 @@ export default function LeadDetail() {
     site: '',
     temWhatsapp: false,
     temSite: false,
+    googleMapsRating: '',
+    hasProduct: false,
+    instagram: '',
+    instagramQuality: '',
+    observacoes: '',
+    porte: '',
+    tempoMercado: '',
   });
   const [savingInfo, setSavingInfo] = useState(false);
 
@@ -48,6 +55,12 @@ export default function LeadDetail() {
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiAnalysisAt, setAiAnalysisAt] = useState(null);
   const [analyzingAI, setAnalyzingAI] = useState(false);
+
+  // AI Assistant
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantResponse, setAssistantResponse] = useState('');
+  const [assistantHistory, setAssistantHistory] = useState([]);
+  const [assistantExpanded, setAssistantExpanded] = useState(null); // id do item expandido
   const [aiError, setAiError] = useState('');
   const [copiedField, setCopiedField] = useState('');
 
@@ -64,6 +77,13 @@ export default function LeadDetail() {
         site: l?.site || '',
         temWhatsapp: l?.temWhatsapp || false,
         temSite: l?.temSite || false,
+        googleMapsRating: l?.googleMapsRating || '',
+        hasProduct: l?.hasProduct || false,
+        instagram: l?.instagram || '',
+        instagramQuality: l?.instagramQuality || '',
+        observacoes: l?.observacoes || '',
+        porte: l?.porte || '',
+        tempoMercado: l?.tempoMercado || '',
       });
 
       // Carregar análise AI salva
@@ -73,7 +93,9 @@ export default function LeadDetail() {
       }
       
       const raw = interRes.data?.interactions || interRes.data || [];
-      setInteractions([...raw].sort((a, b) => new Date(b.data || b.createdAt) - new Date(a.data || a.createdAt)));
+      const all = [...raw].sort((a, b) => new Date(b.data || b.createdAt) - new Date(a.data || a.createdAt));
+      setInteractions(all.filter(i => i.tipo !== 'ia_assistant'));
+      setAssistantHistory(all.filter(i => i.tipo === 'ia_assistant'));
     }).catch(() => setError('Erro ao carregar dados do lead'))
       .finally(() => setLoading(false));
   }, [id]);
@@ -126,6 +148,27 @@ export default function LeadDetail() {
     }
   }
 
+  async function handleOpenAssistant() {
+    setAssistantLoading(true);
+    try {
+      const res = await api.post(`/leads/${id}/assistant`);
+      const nova = res.data.assistencia || 'Assistente não retornou resposta.';
+      setAssistantResponse(nova);
+      // Atualizar histórico com o retorno do servidor
+      if (res.data.historico) {
+        setAssistantHistory(res.data.historico);
+      }
+      // Expandir a resposta mais recente automaticamente
+      if (res.data.historico?.length > 0) {
+        setAssistantExpanded(res.data.historico[0].id);
+      }
+    } catch (err) {
+      setAssistantResponse(`❌ Erro ao consultar assistente: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
   function copyToClipboard(text, field) {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedField(field);
@@ -151,6 +194,13 @@ export default function LeadDetail() {
       site: lead?.site || '',
       temWhatsapp: lead?.temWhatsapp || false,
       temSite: lead?.temSite || false,
+      googleMapsRating: lead?.googleMapsRating || '',
+      hasProduct: lead?.hasProduct || false,
+      instagram: lead?.instagram || '',
+      instagramQuality: lead?.instagramQuality || '',
+      observacoes: lead?.observacoes || '',
+      porte: lead?.porte || '',
+      tempoMercado: lead?.tempoMercado || '',
     });
     setEditingInfo(false);
   }
@@ -158,7 +208,7 @@ export default function LeadDetail() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-700" />
       </div>
     );
   }
@@ -171,7 +221,7 @@ export default function LeadDetail() {
     <div className="max-w-3xl mx-auto">
       <button
         onClick={() => navigate('/leads')}
-        className="flex items-center gap-2 text-sm text-gray-500 hover:text-indigo-600 mb-6 transition-colors"
+        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gold-700 mb-6 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Voltar para Leads
@@ -197,7 +247,7 @@ export default function LeadDetail() {
               value={lead?.status || 'novo'}
               onChange={handleStatusChange}
               disabled={statusUpdating}
-              className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gold-500 bg-white"
             >
               {STATUSES.map((s) => (
                 <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
@@ -214,7 +264,7 @@ export default function LeadDetail() {
           {!editingInfo && (
             <button
               onClick={() => setEditingInfo(true)}
-              className="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-gold-700 hover:text-gold-600 transition-colors"
             >
               <Edit2 className="w-4 h-4" />
               Editar
@@ -224,91 +274,188 @@ export default function LeadDetail() {
 
         {editingInfo ? (
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Site
-              </label>
-              <input
-                type="url"
-                value={editForm.site}
-                onChange={(e) => setEditForm({ ...editForm, site: e.target.value })}
-                placeholder="https://exemplo.com"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+            {/* Linha 1: Site + Instagram */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Site</label>
+                <input type="url" value={editForm.site} onChange={(e) => setEditForm({...editForm, site: e.target.value})}
+                  placeholder="https://exemplo.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
+                <input type="text" value={editForm.instagram} onChange={(e) => setEditForm({...editForm, instagram: e.target.value})}
+                  placeholder="@usuario"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold-500" />
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={editForm.temWhatsapp}
-                  onChange={(e) => setEditForm({ ...editForm, temWhatsapp: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300"
-                />
-                <span className="text-sm text-gray-700">Tem WhatsApp</span>
+            {/* Checkboxes */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                <input type="checkbox" checked={editForm.temWhatsapp} onChange={(e) => setEditForm({...editForm, temWhatsapp: e.target.checked})}
+                  className="w-4 h-4 rounded border-gray-300 text-gold-700" />
+                <span className="text-sm text-gray-700">📱 WhatsApp</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={editForm.temSite}
-                  onChange={(e) => setEditForm({ ...editForm, temSite: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300"
-                />
-                <span className="text-sm text-gray-700">Tem Site</span>
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                <input type="checkbox" checked={editForm.temSite} onChange={(e) => setEditForm({...editForm, temSite: e.target.checked})}
+                  className="w-4 h-4 rounded border-gray-300 text-gold-700" />
+                <span className="text-sm text-gray-700">🌐 Tem Site</span>
               </label>
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-200">
+                <input type="checkbox" checked={editForm.hasProduct} onChange={(e) => setEditForm({...editForm, hasProduct: e.target.checked})}
+                  className="w-4 h-4 rounded border-gray-300 text-gold-700" />
+                <span className="text-sm text-gray-700">📦 Tem Produto Digital</span>
+              </label>
+            </div>
+
+            {/* Selectores */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">⭐ Google Maps</label>
+                <select value={editForm.googleMapsRating} onChange={(e) => setEditForm({...editForm, googleMapsRating: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold-500">
+                  <option value="">Selecione...</option>
+                  <option value="Alto">⭐⭐⭐ Bem avaliado (4+ estrelas)</option>
+                  <option value="Medio">⭐⭐ Avaliação média (3-4 estrelas)</option>
+                  <option value="Baixo">⭐ Mal avaliado (abaixo de 3)</option>
+                  <option value="NaoTem">❌ Não tem avaliações</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">📸 Instagram</label>
+                <select value={editForm.instagramQuality} onChange={(e) => setEditForm({...editForm, instagramQuality: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold-500">
+                  <option value="">Selecione...</option>
+                  <option value="Bom">🔥 Bom - ativo com engajamento</option>
+                  <option value="Medio">👌 Médio - publicado mas sem engajamento</option>
+                  <option value="Ruim">📉 Ruim - perfil parado ou sem conteúdo</option>
+                  <option value="NaoTem">❌ Não tem Instagram</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">🏢 Porte do Negócio</label>
+                <select value={editForm.porte} onChange={(e) => setEditForm({...editForm, porte: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold-500">
+                  <option value="">Selecione...</option>
+                  <option value="Pequeno">🏪 Pequeno (MEI/autônomo)</option>
+                  <option value="Medio">🏢 Médio (até 10 funcionários)</option>
+                  <option value="Grande">🏛️ Grande (acima de 10)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">⏳ Tempo de Mercado</label>
+                <select value={editForm.tempoMercado} onChange={(e) => setEditForm({...editForm, tempoMercado: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold-500">
+                  <option value="">Selecione...</option>
+                  <option value="Menos1ano">🌱 Menos de 1 ano</option>
+                  <option value="1a3anos">🌿 De 1 a 3 anos</option>
+                  <option value="3a5anos">🌳 De 3 a 5 anos</option>
+                  <option value="Mais5anos">🌲 Mais de 5 anos</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Anotações */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">📝 Anotações</label>
+              <textarea value={editForm.observacoes} onChange={(e) => setEditForm({...editForm, observacoes: e.target.value})}
+                rows={3} placeholder="Informações relevantes sobre o lead..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 resize-none" />
             </div>
 
             <div className="flex gap-2 pt-2">
-              <button
-                onClick={handleSaveInfo}
-                disabled={savingInfo}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <Check className="w-4 h-4" />
-                Salvar
+              <button onClick={handleSaveInfo} disabled={savingInfo}
+                className="flex items-center gap-2 px-4 py-2 bg-gold-700 hover:bg-gold-500 disabled:bg-gold-300 text-dark-900 text-sm font-medium rounded-lg transition-colors">
+                <Check className="w-4 h-4" /> Salvar
               </button>
-              <button
-                onClick={handleCancelEdit}
-                disabled={savingInfo}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm font-medium rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-                Cancelar
+              <button onClick={handleCancelEdit} disabled={savingInfo}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+                <X className="w-4 h-4" /> Cancelar
               </button>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <p className="text-xs font-medium text-gray-500 mb-2">Site</p>
-              {lead?.site ? (
-                <a
-                  href={lead.site}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-indigo-600 hover:text-indigo-700 hover:underline break-all text-sm flex items-center gap-1"
-                >
-                  {lead.site}
-                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                </a>
-              ) : (
-                <p className="text-sm text-gray-400">Não informado</p>
-              )}
-            </div>
-            
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <p className="text-xs font-medium text-gray-500 mb-2">WhatsApp</p>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead?.temWhatsapp ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
-                {lead?.temWhatsapp ? '✓ Tem WhatsApp' : '✗ Sem WhatsApp'}
-              </span>
+          <div className="space-y-3">
+            {/* Primeira linha: Site, Instagram, WhatsApp */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-500 mb-1">🌐 Site</p>
+                {lead?.site ? (
+                  <a href={lead.site} target="_blank" rel="noopener noreferrer"
+                    className="text-gold-700 hover:text-gold-600 hover:underline text-sm flex items-center gap-1 break-all">
+                    {lead.site} <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  </a>
+                ) : <p className="text-sm text-gray-400">Não informado</p>}
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-500 mb-1">📸 Instagram</p>
+                {lead?.instagram ? (
+                  <p className="text-sm text-gray-700">{lead.instagram}</p>
+                ) : <p className="text-sm text-gray-400">Não informado</p>}
+                {lead?.instagramQuality && (
+                  <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                    lead.instagramQuality === 'Bom' ? 'bg-green-100 text-green-800' :
+                    lead.instagramQuality === 'Medio' ? 'bg-yellow-100 text-yellow-800' :
+                    lead.instagramQuality === 'Ruim' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>{lead.instagramQuality}</span>
+                )}
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-500 mb-1">📱 WhatsApp</p>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead?.temWhatsapp ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                  {lead?.temWhatsapp ? '✓ Tem WhatsApp' : '✗ Sem WhatsApp'}
+                </span>
+              </div>
             </div>
 
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <p className="text-xs font-medium text-gray-500 mb-2">Tem Site</p>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead?.temSite ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
-                {lead?.temSite ? '✓ Tem Site' : '✗ Sem Site'}
-              </span>
+            {/* Segunda linha: Google Maps, Produto, Porte, Tempo */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-500 mb-1">⭐ Google Maps</p>
+                {lead?.googleMapsRating ? (
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    lead.googleMapsRating === 'Alto' ? 'bg-green-100 text-green-800' :
+                    lead.googleMapsRating === 'Medio' ? 'bg-yellow-100 text-yellow-800' :
+                    lead.googleMapsRating === 'Baixo' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>{lead.googleMapsRating}</span>
+                ) : <p className="text-sm text-gray-400">Não informado</p>}
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-500 mb-1">📦 Produto Digital</p>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead?.hasProduct ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                  {lead?.hasProduct ? '✓ Sim' : '✗ Não'}
+                </span>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-500 mb-1">🏢 Porte</p>
+                {lead?.porte ? <p className="text-sm text-gray-700">{lead.porte}</p> : <p className="text-sm text-gray-400">-</p>}
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-500 mb-1">⏳ Tempo Mercado</p>
+                {lead?.tempoMercado ? (
+                  <span className="text-sm text-gray-700">{{
+                    'Menos1ano': 'Menos de 1 ano',
+                    '1a3anos': '1 a 3 anos',
+                    '3a5anos': '3 a 5 anos',
+                    'Mais5anos': 'Mais de 5 anos',
+                  }[lead.tempoMercado] || lead.tempoMercado}</span>
+                ) : <p className="text-sm text-gray-400">-</p>}
+              </div>
             </div>
+
+            {/* Anotações */}
+            {lead?.observacoes && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-500 mb-1">📝 Anotações</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{lead.observacoes}</p>
+              </div>
+            )}
 
             {lead?.avaliacao && (
               <div className="p-4 bg-gray-50 rounded-lg">
@@ -324,7 +471,7 @@ export default function LeadDetail() {
       </div>
 
       {/* AI Analysis */}
-      <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-200 rounded-xl shadow-sm p-6 mb-6">
+      <div className="bg-gradient-to-br from-dark-900/5 to-gold-50 border border-gold-200 rounded-xl shadow-sm p-6 mb-6">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-violet-600" />
@@ -454,37 +601,157 @@ export default function LeadDetail() {
         )}
       </div>
 
+      {/* Assistente de Vendas IA - Painel Fixo com Histórico */}
+      <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200 rounded-xl shadow-sm p-6 mb-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg">
+              <Bot className="w-4 h-4 text-white" />
+            </div>
+            <h2 className="text-base font-semibold text-gray-900">Assistente de Vendas IA</h2>
+            {assistantHistory.length > 0 && (
+              <span className="text-xs text-gray-400">· {assistantHistory.length} análise{assistantHistory.length > 1 ? 's' : ''}</span>
+            )}
+          </div>
+          <button
+            onClick={handleOpenAssistant}
+            disabled={assistantLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 disabled:from-violet-300 disabled:to-purple-300 text-white text-sm font-medium rounded-lg transition-all shadow-sm hover:shadow-md"
+          >
+            {assistantLoading ? (
+              <><RefreshCw className="w-4 h-4 animate-spin" /> Analisando...</>
+            ) : (
+              <><Bot className="w-4 h-4" /> Nova Análise</>
+            )}
+          </button>
+        </div>
+
+        {assistantLoading && (
+          <div className="flex flex-col items-center justify-center py-10 gap-3 text-violet-500">
+            <div className="relative">
+              <RefreshCw className="w-8 h-8 animate-spin" />
+              <Bot className="w-3 h-3 text-violet-700 absolute -bottom-0.5 -right-0.5" />
+            </div>
+            <p className="text-sm font-medium">Analisando interações e gerando recomendações...</p>
+          </div>
+        )}
+
+        {/* Timeline de análises anteriores */}
+        {!assistantLoading && assistantHistory.length > 0 && (
+          <div className="space-y-3">
+            {assistantHistory.map((item) => {
+              const isExpanded = assistantExpanded === item.id;
+              const lines = (item.conteudo || '').split('\n').filter(l => l.trim());
+              const preview = lines.slice(0, 2).join(' · ').substring(0, 120);
+              
+              return (
+                <div key={item.id} className="bg-white rounded-lg border border-violet-100 overflow-hidden">
+                  <button
+                    onClick={() => setAssistantExpanded(isExpanded ? null : item.id)}
+                    className="w-full flex items-center justify-between p-3 hover:bg-violet-50/50 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Bot className="w-4 h-4 text-violet-500 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-gray-700">
+                          Análise · {new Date(item.data).toLocaleString('pt-BR')}
+                        </p>
+                        {!isExpanded && preview && (
+                          <p className="text-xs text-gray-400 truncate mt-0.5">{preview}...</p>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isExpanded && (
+                    <div className="px-3 pb-3 space-y-3 border-t border-violet-50 pt-3">
+                      {lines.map((line, i) => {
+                        if (line.startsWith('🎯') || line.startsWith('📊') || line.startsWith('💡') || 
+                            line.startsWith('📝') || line.startsWith('⏰') || line.startsWith('⚡')) {
+                          const emoji = line.charAt(0);
+                          const titleMatch = line.match(/\*\*(.+?)\*\*/);
+                          const title = titleMatch ? titleMatch[1] : '';
+                          const content = line.replace(/\*\*(.+?)\*\*/, '').replace(emoji, '').trim();
+                          const iconMap = {
+                            '🎯': <Target className="w-4 h-4 text-violet-600" />,
+                            '📊': <BarChart className="w-4 h-4 text-blue-600" />,
+                            '💡': <Lightbulb className="w-4 h-4 text-amber-500" />,
+                            '📝': <MessageCircle className="w-4 h-4 text-green-600" />,
+                            '⏰': <Clock className="w-4 h-4 text-orange-500" />,
+                            '⚡': <Sparkles className="w-4 h-4 text-yellow-500" />,
+                          };
+                          return (
+                            <div key={i} className="bg-violet-50/50 rounded-lg p-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                {iconMap[emoji] || <Sparkles className="w-4 h-4" />}
+                                <h4 className="text-xs font-bold text-gray-800">{title}</h4>
+                              </div>
+                              <p className="text-xs text-gray-600 leading-relaxed ml-6 whitespace-pre-wrap">{content}</p>
+                            </div>
+                          );
+                        }
+                        if (line.trim() === '') return null;
+                        return <p key={i} className="text-xs text-gray-500 ml-6">{line}</p>;
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Estado vazio */}
+        {!assistantLoading && assistantHistory.length === 0 && (
+          <div className="text-center py-8 text-gray-400">
+            <Bot className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="text-sm">Clique em <strong>Nova Análise</strong> para gerar recomendações de vendas baseadas no histórico de interações.</p>
+            <div className="flex flex-wrap justify-center gap-4 mt-4 text-xs text-gray-400">
+              <span>🎯 Próximo passo</span>
+              <span>📊 Análise do momento</span>
+              <span>💡 Oportunidades</span>
+              <span>📝 Script sugerido</span>
+              <span>⏰ Timing ideal</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Add interaction */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Adicionar Interação</h2>
         <form onSubmit={handleAddInteraction} className="space-y-3">
           <div className="flex gap-3">
-            {TIPOS.map(({ value, label, icon: Icon }) => (
-              <label key={value} className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="tipo"
-                  value={value}
-                  checked={interactionForm.tipo === value}
-                  onChange={(e) => setInteractionForm((f) => ({ ...f, tipo: e.target.value }))}
-                  className="accent-indigo-600"
-                />
-                <Icon className="w-4 h-4 text-gray-500" />
-                <span className="text-sm text-gray-700">{label}</span>
-              </label>
-            ))}
+            {TIPOS.map((item) => {
+              const TipoIcon = item.icon;
+              return (
+                <label key={item.value} className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="tipo"
+                    value={item.value}
+                    checked={interactionForm.tipo === item.value}
+                    onChange={(e) => setInteractionForm((f) => ({ ...f, tipo: e.target.value }))}
+                    className="accent-gold-700"
+                  />
+                  <TipoIcon className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-gray-700">{item.label}</span>
+                </label>
+              );
+            })}
           </div>
           <textarea
             value={interactionForm.conteudo}
             onChange={(e) => setInteractionForm((f) => ({ ...f, conteudo: e.target.value }))}
             rows={3}
             placeholder="Descreva a interação..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 resize-none"
           />
           <button
             type="submit"
             disabled={submitting || !interactionForm.conteudo.trim()}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-medium rounded-lg transition-colors"
+                className="px-4 py-2 bg-gold-700 hover:bg-gold-500 disabled:bg-gold-300 text-dark-900 text-sm font-medium rounded-lg transition-colors"
           >
             {submitting ? 'Adicionando...' : 'Adicionar'}
           </button>
@@ -517,6 +784,8 @@ export default function LeadDetail() {
           </div>
         )}
       </div>
+
+
     </div>
   );
 }

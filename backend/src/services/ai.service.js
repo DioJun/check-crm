@@ -1,21 +1,20 @@
-const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+// ==================== CONFIGURAÇÃO DO PROVIDER DE IA ====================
+// Por padrão usa DeepSeek. Defina AI_PROVIDER=gemini no .env para usar Gemini.
+// DeepSeek usa API compatível com OpenAI.
 
-// Função para aguardar com delay
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function analyzeLeadWithGemini(lead, retryCount = 0, maxRetries = 10) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
-
-  // Formatar interações para o prompt
+function buildPrompt(lead) {
   const interacoesTexto = lead.interacoes && lead.interacoes.length > 0
     ? lead.interacoes.map((i) => `- ${new Date(i.data).toLocaleString('pt-BR')}: ${i.conteudo}`).join('\n')
     : 'Nenhuma interação registrada';
 
-  const prompt = `Você é um consultor de vendas especializado em vender sites, sistemas web, CRMs e softwares para pequenas e médias empresas brasileiras.
+  return `Você é um consultor de vendas especializado em vender sites, sistemas web, CRMs e softwares para pequenas e médias empresas brasileiras.
 
 SEUS SERVIÇOS:
 - Criação de sites profissionais
@@ -42,13 +41,20 @@ DADOS DO LEAD:
 - Telefone: ${lead.telefone || 'Não informado'}
 - Cidade: ${lead.cidade || 'Não informada'}
 - Ramo/Serviço: ${lead.servico || 'Não informado'}
+- Status: ${lead.status || 'novo'}
+- Origem: ${lead.origem || 'Não informada'}
 - Tem WhatsApp: ${lead.temWhatsapp ? 'Sim' : 'Não'}
 - Tem Site: ${lead.temSite ? 'Sim' : 'Não'}
 - Site atual: ${lead.site || 'Não tem'}
+- Instagram: ${lead.instagram || 'Não informado'}
+- Qualidade do Instagram: ${lead.instagramQuality || 'Não informada'}
+- Reputação no Google Maps: ${lead.googleMapsRating || 'Não informada'}
 - Avaliação Google: ${lead.avaliacao || 'Não informada'}
-- Número de avaliações: ${lead.reviews || 'Não informado'}
-- Origem: ${lead.origem || 'Não informada'}
-- Status: ${lead.status || 'novo'}
+- Número de reviews: ${lead.reviews || 'Não informado'}
+- Porte do negócio: ${lead.porte || 'Não informado'}
+- Tempo de mercado: ${lead.tempoMercado || 'Não informado'}
+- Já tem produto digital: ${lead.hasProduct ? 'Sim' : 'Não'}
+- Anotações: ${lead.observacoes || 'Nenhuma anotação'}
 
 HISTÓRICO DE INTERAÇÕES E ANOTAÇÕES:
 ${interacoesTexto}
@@ -65,6 +71,94 @@ Retorne este JSON exatamente (preencha todos os campos):
   "prioridade": "alta | media | baixa",
   "justificativaPrioridade": "Por que essa prioridade (1-2 frases explicando potencial do negócio para seus serviços)"
 }`;
+}
+
+function parseJsonResponse(raw) {
+  let cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (parseErr) {
+    const fixJsonString = (str) => {
+      return str.replace(/"([^"\\]|\\.)*"/g, (match) => {
+        return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t').replace(/"/g, (m, i) => i === 0 || i === match.length - 1 ? m : '\\"');
+      });
+    };
+    try {
+      cleaned = fixJsonString(cleaned);
+      return JSON.parse(cleaned);
+    } catch (secondErr) {
+      console.error(`[AI Analysis] JSON parsing failed: ${parseErr.message}`);
+      return {
+        diagnostico: 'Erro ao processar análise da IA. Tente novamente.',
+        servicoRecomendado: 'Recomendação não disponível',
+        proposta: 'Não foi possível gerar proposta',
+        abordagem: 'Não foi possível gerar abordagem',
+        comoSerConvincente: 'Não foi possível gerar argumentos',
+        pitchWhatsApp: 'Não foi possível gerar pitch',
+        pitchLigacao: 'Não foi possível gerar script',
+        prioridade: 'media',
+        justificativaPrioridade: 'Análise indisponível no momento'
+      };
+    }
+  }
+}
+
+// ==================== DEEPSEEK (PADRÃO) ====================
+async function analyzeLeadWithDeepSeek(lead, retryCount = 0, maxRetries = 5) {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY não configurada');
+
+  const prompt = buildPrompt(lead);
+
+  const body = {
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: 'Você é um assistente especializado em análise de leads e vendas consultivas. Sempre responda APENAS com JSON válido, sem markdown.' },
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.7,
+    max_tokens: 2048,
+  };
+
+  const res = await fetch(DEEPSEEK_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    let errorMessage = '';
+    try {
+      const errData = await res.json();
+      errorMessage = errData?.error?.message || `DeepSeek API error ${res.status}`;
+    } catch {
+      errorMessage = `DeepSeek API error ${res.status}`;
+    }
+    console.log(`[DeepSeek API] Erro: ${errorMessage}`);
+
+    if ((res.status === 429 || res.status === 502 || res.status === 503) && retryCount < maxRetries) {
+      const delayMs = Math.pow(2, retryCount + 1) * 1000;
+      console.log(`[DeepSeek] Tentativa ${retryCount + 1}/${maxRetries}. Aguardando ${delayMs / 1000}s...`);
+      await sleep(delayMs);
+      return analyzeLeadWithDeepSeek(lead, retryCount + 1, maxRetries);
+    }
+    throw new Error(errorMessage);
+  }
+
+  const data = await res.json();
+  const raw = data?.choices?.[0]?.message?.content || '';
+  return parseJsonResponse(raw);
+}
+
+// ==================== GEMINI (ALTERNATIVA) ====================
+async function analyzeLeadWithGemini(lead, retryCount = 0, maxRetries = 10) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
+
+  const prompt = buildPrompt(lead);
 
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -79,93 +173,171 @@ Retorne este JSON exatamente (preencha todos os campos):
 
   if (!res.ok) {
     let errorMessage = '';
-    let errorDetails = {};
-    
     try {
-      errorDetails = await res.json();
-      errorMessage = errorDetails?.error?.message || `Gemini API error ${res.status}`;
+      const errData = await res.json();
+      errorMessage = errData?.error?.message || `Gemini API error ${res.status}`;
     } catch {
       errorMessage = `Gemini API error ${res.status}`;
     }
-    
-    console.log(`[Gemini API] Resposta de erro: ${errorMessage}`);
-    
-    // Se for erro de alta demanda (429 ou mensagem específica), fazer retry
-    const isHighDemandError = res.status === 429 || 
-                              errorMessage.toLowerCase().includes('high demand') || 
-                              errorMessage.toLowerCase().includes('resource exhausted') ||
-                              errorMessage.toLowerCase().includes('quota') ||
-                              res.status === 503 || // Service Unavailable
-                              res.status === 502;   // Bad Gateway
-    
+    console.log(`[Gemini API] Erro: ${errorMessage}`);
+
+    const isHighDemandError = res.status === 429 ||
+      errorMessage.toLowerCase().includes('high demand') ||
+      errorMessage.toLowerCase().includes('resource exhausted') ||
+      errorMessage.toLowerCase().includes('quota') ||
+      res.status === 503 || res.status === 502;
+
     if (isHighDemandError && retryCount < maxRetries) {
-      // Backoff exponencial com mais tempo: 2s, 4s, 8s, 16s, 32s, 64s, etc.
       const delayMs = Math.pow(2, retryCount + 1) * 1000;
-      const totalTime = Math.round(delayMs / 1000);
-      console.log(`[Gemini API] Alta demanda detectada. Tentativa ${retryCount + 1}/${maxRetries}. Aguardando ${totalTime}s...`);
-      
+      console.log(`[Gemini] Tentativa ${retryCount + 1}/${maxRetries}. Aguardando ${delayMs / 1000}s...`);
       await sleep(delayMs);
-      
-      // Tentar novamente recursivamente
       return analyzeLeadWithGemini(lead, retryCount + 1, maxRetries);
     }
-    
     throw new Error(errorMessage);
   }
 
   const data = await res.json();
   const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-  // Strip any markdown code fences if the model added them
-  let cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-
-  // Tentar fazer parse do JSON limpo
-  try {
-    return JSON.parse(cleaned);
-  } catch (parseErr) {
-    // Se falhar, tentar fix adicional: remover quebras de linha dentro de strings JSON
-    // Esta é uma abordagem mais agressiva que trata caracteres problemáticos
-    
-    // Função auxiliar para escapar strings JSON
-    const fixJsonString = (str) => {
-      // Encontrar todas as strings entre aspas e escapar caracteres problemáticos
-      return str.replace(/"([^"\\]|\\.)*"/g, (match) => {
-        // Dentro das aspas, escapar quebras de linha e caracteres especiais
-        return match
-          .replace(/\n/g, '\\n')
-          .replace(/\r/g, '\\r')
-          .replace(/\t/g, '\\t')
-          .replace(/"/g, (m, i) => i === 0 || i === match.length - 1 ? m : '\\"');
-      });
-    };
-
-    try {
-      cleaned = fixJsonString(cleaned);
-      return JSON.parse(cleaned);
-    } catch (secondErr) {
-      // Se ainda falhar, logar o erro e tentar usar regex para extrair os campos
-      console.error(`[AI Analysis] JSON parsing failed: ${parseErr.message}`);
-      console.error(`[AI Analysis] Raw response:`, raw.substring(0, 200) + '...');
-      
-      // Fallback: retornar um objeto padrão com mensagem de erro
-      return {
-        diagnostico: 'Erro ao processar análise da IA. Tente novamente.',
-        servicoRecomendado: 'Recomendação não disponível',
-        proposta: 'Não foi possível gerar proposta',
-        abordagem: 'Não foi possível gerar abordagem',
-        comoSerConvincente: 'Não foi possível gerar argumentos',
-        pitchWhatsApp: 'Não foi possível gerar pitch',
-        pitchLigacao: 'Não foi possível gerar script',
-        prioridade: 'media',
-        justificativaPrioridade: 'Análise indisponível no momento'
-      };
-    }
-  }
-
-  // Log sucesso se teve retries
-  if (retryCount > 0) {
-    console.log(`[Gemini API] Sucesso após ${retryCount} retry(ies)!`);
-  }
+  return parseJsonResponse(raw);
 }
 
-module.exports = { analyzeLeadWithGemini };
+// ==================== FUNÇÃO PRINCIPAL ====================
+async function callAI(prompt, systemMessage) {
+  const provider = (process.env.AI_PROVIDER || 'deepseek').toLowerCase();
+  console.log(`[AI] Usando provider: ${provider}`);
+
+  if (provider === 'gemini') {
+    // Para Gemini, usamos a função existente com o prompt diretamente
+    // (adaptação: cria um mini-wrapper)
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
+    const body = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+    };
+    const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Gemini API error ${res.status}`);
+    const data = await res.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  // DeepSeek (padrão)
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY não configurada');
+  const body = {
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: systemMessage || 'Você é um assistente especializado em vendas.' },
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.7,
+    max_tokens: 4096,
+  };
+  const res = await fetch(DEEPSEEK_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let msg = '';
+    try { const e = await res.json(); msg = e?.error?.message || `DeepSeek API error ${res.status}`; }
+    catch { msg = `DeepSeek API error ${res.status}`; }
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  return data?.choices?.[0]?.message?.content || '';
+}
+
+async function analyzeLead(lead) {
+  const provider = (process.env.AI_PROVIDER || 'deepseek').toLowerCase();
+  console.log(`[AI] Usando provider: ${provider}`);
+
+  if (provider === 'gemini') {
+    return analyzeLeadWithGemini(lead);
+  }
+  return analyzeLeadWithDeepSeek(lead);
+}
+
+// ==================== ASSISTENTE DE VENDAS ====================
+// Analisa todo o histórico de interações e ajuda na tomada de decisões
+async function assistLead(lead) {
+  const interacoesTexto = lead.interacoes && lead.interacoes.length > 0
+    ? lead.interacoes.map((i, idx) =>
+        `[${idx + 1}] ${new Date(i.data).toLocaleString('pt-BR')} (${i.tipo}): ${i.conteudo}`
+      ).join('\n')
+    : 'Nenhuma interação registrada ainda.';
+
+  const prompt = `Você é o melhor assistente de vendas do mundo, especialista em CRM e gestão de leads. 
+Sua função é ANALISAR TODO O HISTÓRICO do lead e dar conselhos práticos e acionáveis para o vendedor.
+
+## REGRAS DE OURO:
+1. Seja EXTREMAMENTE prático e direto — o vendedor precisa de ação, não de teoria
+2. Analise CADA interação individualmente e identifique padrões
+3. Baseie suas recomendações SOMENTE nos dados reais do lead e histórico
+4. Se não houver interações, foque em como iniciar o contato da melhor forma
+5. Identifique objeções, interesses, hesitações no histórico
+6. Sugira o PRÓXIMO PASSO ideal (momento, canal, mensagem)
+7. Avalie o momento do lead na jornada de compra
+8. Destaque oportunidades que o vendedor pode estar perdendo
+
+## FORMATAÇÃO DA RESPOSTA:
+Responda EXATAMENTE neste formato, sem markdown, sem texto extra:
+
+🎯 **PRÓXIMO PASSO RECOMENDADO**
+[Qual deve ser a PRÓXIMA ação do vendedor - seja específico: "Ligue amanhã às 10h", "Envie WhatsApp sobre X", "Aguardar resposta", etc]
+
+📊 **ANÁLISE DO MOMENTO**
+[Como está o envolvimento do lead? Está quente, morno ou frio? O que o histórico indica?]
+
+💡 **OPORTUNIDADES IDENTIFICADAS**
+[O que o vendedor pode estar perdendo? Algum interesse não explorado? Alguma objeção que precisa ser endereçada?]
+
+📝 **SUGESTÃO DE ABORDAGEM**
+[Texto/script SUGERIDO para o próximo contato - personalizado com base no histórico, tom natural e consultivo]
+
+⏰ **TIMING RECOMENDADO**
+[Quando fazer o próximo contato? Imediatamente, em X dias, aguardar lead tomar ação?]
+
+⚡ **DICA RÁPIDA**
+[Uma dica de ouro específica para este lead]
+
+DADOS DO LEAD:
+- Nome: ${lead.nome || 'Não informado'}
+- Telefone: ${lead.telefone || 'Não informado'}
+- Cidade: ${lead.cidade || 'Não informada'}
+- Serviço/Ramo: ${lead.servico || 'Não informado'}
+- Status: ${lead.status || 'novo'}
+- Origem: ${lead.origem || 'Não informada'}
+- Tem WhatsApp: ${lead.temWhatsapp ? 'Sim' : 'Não'}
+- Tem Site: ${lead.temSite ? 'Sim' : 'Não'}
+- Site: ${lead.site || 'Não tem'}
+- Instagram: ${lead.instagram || 'Não informado'}
+- Instagram Qualidade: ${lead.instagramQuality || 'Não informada'}
+- Google Maps: ${lead.googleMapsRating || 'Não informada'}
+- Porte: ${lead.porte || 'Não informado'}
+- Tempo Mercado: ${lead.tempoMercado || 'Não informado'}
+- Produto Digital: ${lead.hasProduct ? 'Sim' : 'Não'}
+- Anotações: ${lead.observacoes || 'Nenhuma'}
+
+HISTÓRICO COMPLETO DE INTERAÇÕES:
+${interacoesTexto}`;
+
+  const systemMessage = `Você é o melhor assistente de vendas do mundo. 
+Suas características:
+- Analisa profundamente o histórico de interações com o lead
+- Dá conselhos práticos, específicos e acionáveis
+- Nunca é genérico — sempre baseado nos dados reais
+- Foco em ajudar o vendedor a tomar a MELHOR decisão
+- Identifica oportunidades, riscos e o timing ideal
+- Sugere scripts e abordagens personalizadas
+- É direto, honesto e extremamente útil
+- Pensa como um vendedor top 1% que já fechou milhares de negócios`;
+
+  const raw = await callAI(prompt, systemMessage);
+  return raw;
+}
+
+module.exports = { analyzeLead, analyzeLeadWithGemini, analyzeLeadWithDeepSeek, assistLead };

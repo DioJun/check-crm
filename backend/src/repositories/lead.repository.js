@@ -15,7 +15,7 @@ async function findById(id) {
 }
 
 async function findByTelefone(telefone) {
-  return prisma.lead.findUnique({ where: { telefone } });
+  return prisma.lead.findFirst({ where: { telefone } });
 }
 
 async function create(data) {

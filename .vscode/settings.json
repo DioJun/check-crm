@@ -20,6 +20,19 @@
         "/^cd \"c:\\\\Users\\\\dioni\\\\OneDrive\\\\Documentos\\\\dev\\\\check-crm\\\\backend\" ; node -e \"\nconst XLSX = require\\('xlsx'\\);\nconst wb = XLSX\\.readFile\\('c:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\dioni\\\\\\\\\\\\\\\\OneDrive\\\\\\\\\\\\\\\\Documentos\\\\\\\\\\\\\\\\Checkmate Code Solutions\\\\\\\\\\\\\\\\Manicure leads\\.xlsx'\\);\nconsole\\.log\\('Sheets:', wb\\.SheetNames\\);\nconst ws = wb\\.Sheets\\[wb\\.SheetNames\\[0\\]\\];\nconst data = XLSX\\.utils\\.sheet_to_json\\(ws\\);\nconsole\\.log\\('Primeiras 2 linhas:'\\);\nconsole\\.log\\(JSON\\.stringify\\(data\\.slice\\(0, 2\\), null, 2\\)\\);\nconsole\\.log\\('Total de linhas:', data\\.length\\);\nconsole\\.log\\('Colunas:', Object\\.keys\\(data\\[0\\] \\|\\| \\{\\}\\)\\);\n\"$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "npx vite": true,
+        "/^cd backend ; node -e \"const ai = require\\('\\./src/services/ai\\.service'\\); console\\.log\\('✓ AI service loaded, functions:', Object\\.keys\\(ai\\)\\.join\\(', '\\)\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd c:\\\\Users\\\\dioni\\\\OneDrive\\\\Documentos\\\\dev\\\\check-crm\\\\backend; node -e \"const ai = require\\('\\./src/services/ai\\.service'\\); console\\.log\\('✓ AI functions:', Object\\.keys\\(ai\\)\\.join\\(', '\\)\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node -e \"const repo = require\\('\\./src/repositories/lead\\.repository'\\); console\\.log\\('✓ Repository OK, functions:', Object\\.keys\\(repo\\)\\.join\\(', '\\)\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

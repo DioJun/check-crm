@@ -4,9 +4,6 @@
  *
  * Puppeteer-extra + stealth para evasão de detecção
  * Scroll automático, User-Agent rotation, delays humanizados
- * 
- * ⚠️ IMPORTANTE: Este serviço FUNCIONA APENAS na versão Desktop (Electron)
- *    Na versão Web (Vercel), o scraper é desabilitado automaticamente
  */
 
 const { URLSearchParams } = require('url');
@@ -450,10 +447,7 @@ class ScraperService {
   }
 
   /**
-   * BUSCA POR TERMO - Funciona APENAS LOCALMENTE com Puppeteer
-   * 
-   * Em Vercel/cloud: Retorna erro claro
-   * Localmente: Usa Puppeteer para buscar e coletar múltiplos resultados
+   * BUSCA POR TERMO - Usa Puppeteer para buscar e coletar múltiplos resultados
    */
   static async searchGoogleMaps(searchTerm) {
     console.log(`🔎 Iniciando busca: "${searchTerm}"`);
@@ -484,7 +478,7 @@ class ScraperService {
       results = results.map(lead => this.qualifyLead(lead));
       
       // PROCESSAR 3: NOVO - Melhorar qualidade (enriquecer dados, validar endereços)
-      results = await this.improveLeadQuality(results);
+      results = await this.improveLeadQuality(results, searchTerm);
       
       // ORDENAR: Leads de melhor qualidade de endereço primeiro, depois qualidade geral
       results = results.sort((a, b) => {
@@ -941,39 +935,96 @@ class ScraperService {
   }
 
   /**
-   * Melhorar qualidade dos dados antes de retornar
-   * Aplica validação e enriquecimento
+   * Extrair cidade do endereço ou dados do lead
    */
-  static async improveLeadQuality(leads) {
+  static extractCity(lead) {
+    const addr = lead.endereco || '';
+    // Padrão: "bairro, Cidade - UF"
+    let m = addr.match(/,?\s*([A-ZÁÉÍÓÚÃÕÇ][a-záéíóúãõç]+)\s*[–-]\s*([A-Z]{2})\b/);
+    if (m) return m[1];
+    // Padrão: "Cidade, Estado"
+    m = addr.match(/([A-ZÁÉÍÓÚÃÕÇ][a-záéíóúãõç]+),\s*([A-Z]{2})\b/);
+    if (m) return m[1];
+    // Tentar última parte antes de estado
+    const parts = addr.split(',').map(p => p.trim());
+    for (let i = parts.length - 2; i >= 0; i--) {
+      if (/[A-ZÁÉÍÓÚÃÕÇ][a-záéíóúãõç]/.test(parts[i]) && parts[i].length > 3) {
+        return parts[i];
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Extrair categoria/serviço do nome ou dados do lead
+   */
+  static extractCategory(lead) {
+    const nome = (lead.nome || '').toLowerCase();
+    const categorias = [
+      { keywords: ['mecânico','oficina','auto','revisão','borracharia','funilaria','pintura','carro','automotivo'], label: 'Automotivo' },
+      { keywords: ['eletricista','elétrica','elétrico','instalação'], label: 'Elétrica' },
+      { keywords: ['encanador','hidráulica','bombeiro','desentupidora','encanamento'], label: 'Hidráulica' },
+      { keywords: ['restaurante','pizzaria','lanchonete','bar','comida','almoço','jantar','hamburguer','esfiha','churrascaria'], label: 'Alimentação' },
+      { keywords: ['advogado','escritório','jurídico','direito','advocacia'], label: 'Jurídico' },
+      { keywords: ['médico','clínica','consultório','dentista','cardiologista','dermatologista'], label: 'Saúde' },
+      { keywords: ['construção','pedreiro','empreiteira','reforma','arquiteto','engenheiro'], label: 'Construção' },
+      { keywords: ['pintor','pintura','revestimento','gesso'], label: 'Pintura' },
+      { keywords: ['limpeza','faxina','higienização','dedetizadora','crise'], label: 'Limpeza' },
+      { keywords: ['segurança','vigilante','alarme','câmera','monitoramento'], label: 'Segurança' },
+      { keywords: ['fotógrafo','filmagem','foto','vídeo'], label: 'Fotografia' },
+      { keywords: ['professor','aula','curso','escola','treinamento'], label: 'Educação' },
+      { keywords: ['design','marketing','publicidade','propaganda','social','mídia'], label: 'Marketing' },
+      { keywords: ['pet','veterinário','animal','cachorro','gato','banho','tosa'], label: 'Pet' },
+      { keywords: ['academia','personal','pilates','crossfit','musculação','esporte'], label: 'Fitness' },
+    ];
+    
+    for (const cat of categorias) {
+      if (cat.keywords.some(k => nome.includes(k))) {
+        return cat.label;
+      }
+    }
+    
+    // Tentar extrair do searchTerm se disponível
+    if (lead.searchTerm) {
+      const termo = lead.searchTerm.toLowerCase();
+      const palavras = termo.split(/\s+/).filter(p => !['em','no','na','de','da','do','para','por'].includes(p));
+      if (palavras.length > 0) {
+        // A primeira palavra significativa é provavelmente a categoria
+        const firstWord = palavras[0].charAt(0).toUpperCase() + palavras[0].slice(1);
+        if (firstWord.length > 3) return firstWord;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Melhorar qualidade dos dados antes de retornar
+   * Aplica validação, enriquecimento e extração de metadados
+   */
+  static async improveLeadQuality(leads, searchTerm) {
     console.log(`📊 Melhorando qualidade de ${leads.length} leads...`);
     
-    // Para cada lead, tentar enriquecer dados
     const improved = await Promise.all(
       leads.map(async (lead) => {
-        // Tentar enriquecer com Nominatim
         let enrichedLead = await this.enrichLeadData(lead);
         
-        // Calcular score de endereço
         enrichedLead.address_validation_score = this.validateAddress(enrichedLead.endereco);
         
-        // Extrair CEP se houver
         const cep = this.extractCEP(enrichedLead.endereco);
-        if (cep) {
-          enrichedLead.cep = cep;
-        }
+        if (cep) enrichedLead.cep = cep;
+        
+        // Extrair cidade e categoria
+        enrichedLead.cidade = this.extractCity(enrichedLead);
+        enrichedLead.categoria = this.extractCategory({ ...enrichedLead, searchTerm });
         
         return enrichedLead;
       })
     );
     
-    // Ordenar por qualidade de endereço
-    improved.sort((a, b) => {
-      const scoreB = b.address_validation_score || 0;
-      const scoreA = a.address_validation_score || 0;
-      return scoreB - scoreA;
-    });
+    improved.sort((a, b) => (b.address_validation_score || 0) - (a.address_validation_score || 0));
     
-    console.log(`✅ ${improved.length} leads melhorados com validação de endereço`);
+    console.log(`✅ ${improved.length} leads enriquecidos`);
     return improved;
   }
 

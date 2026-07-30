@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Upload, ArrowRight, Check, AlertCircle, MapPin, UserPlus, Clock } from 'lucide-react';
+import { Upload, ArrowRight, Check, AlertCircle, MapPin, UserPlus, Clock, Search } from 'lucide-react';
 import api from '../services/api';
+import GoogleMapsScraper from '../components/Scraper/GoogleMapsScraper';
 
 export default function ImportLeads() {
   const [step, setStep] = useState(1); // 1: upload, 2: mapping, 3: confirm, 4: success
@@ -8,6 +9,7 @@ export default function ImportLeads() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showScraper, setShowScraper] = useState(false);
 
   // Manual lead form
   const [showManualForm, setShowManualForm] = useState(false);
@@ -29,8 +31,6 @@ export default function ImportLeads() {
     origem: '',
   });
 
-  // Google Maps cities
-  const [cities, setCities] = useState({});
   const [singleCity, setSingleCity] = useState('');
   const [whatsappStatus, setWhatsappStatus] = useState({});
   const [siteStatus, setSiteStatus] = useState({});
@@ -224,7 +224,19 @@ export default function ImportLeads() {
     }
   }
 
-
+  async function handleScrapedData(lead) {
+    try {
+      await api.post('/leads', {
+        nome: lead.nome,
+        telefone: lead.telefone,
+        cidade: lead.cidade,
+        servico: lead.servico || lead.categoria,
+        origem: 'Google Maps Scraper',
+      });
+    } catch (err) {
+      console.error('Erro ao adicionar lead do scraper:', err);
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -242,7 +254,7 @@ export default function ImportLeads() {
             <div
               className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
                 s <= step
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-gold-700 text-dark-900'
                   : 'bg-gray-200 text-gray-600'
               }`}
             >
@@ -251,7 +263,7 @@ export default function ImportLeads() {
             {s < 4 && (
               <div
                 className={`w-12 h-1 mx-2 ${
-                  s < step ? 'bg-indigo-600' : 'bg-gray-200'
+                  s < step ? 'bg-gold-700' : 'bg-gray-200'
                 }`}
               />
             )}
@@ -333,22 +345,30 @@ export default function ImportLeads() {
             )}
           </div>
 
-          {/* Scraper Card — Em Breve */}
-          <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-lg p-6 opacity-70">
+          {/* Scraper Card — Ativo */}
+          <button
+            onClick={() => setShowScraper(true)}
+            className="w-full bg-gradient-to-r from-gold-700/10 to-gold-500/5 border-2 border-gold-700 rounded-lg p-6 text-left hover:shadow-md transition-all group"
+          >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <MapPin className="w-5 h-5 text-gray-400" />
-                  <h3 className="text-lg font-semibold text-gray-500">Google Maps Scraper</h3>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
-                    <Clock className="w-3 h-3" /> Em breve
+                  <MapPin className="w-5 h-5 text-gold-700" />
+                  <h3 className="text-lg font-semibold text-dark-800 group-hover:text-gold-700 transition-colors">
+                    Google Maps Scraper
+                  </h3>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /> Ativo
                   </span>
                 </div>
-                <p className="text-gray-400 text-sm">Busca automática de negócios no Google Maps. Disponível em versão futura.</p>
+                <p className="text-gray-600 text-sm">Busque negócios automaticamente no Google Maps e importe como leads</p>
               </div>
-              <div className="text-4xl opacity-30">📍</div>
+              <div className="flex items-center gap-2 text-gold-700">
+                <Search className="w-5 h-5" />
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
             </div>
-          </div>
+          </button>
 
           {/* OR Divider */}
           <div className="flex items-center gap-4">
@@ -376,7 +396,7 @@ export default function ImportLeads() {
               />
               <label
                 htmlFor="file-input"
-                className="inline-block px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg cursor-pointer transition-colors"
+                className="inline-block px-6 py-2 bg-gold-700 hover:bg-gold-500 text-dark-900 font-medium rounded-lg cursor-pointer transition-colors"
               >
                 Escolher arquivo
               </label>
@@ -391,7 +411,7 @@ export default function ImportLeads() {
               <button
                 onClick={handleUpload}
                 disabled={!file || loading}
-                className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors"
+                className="flex items-center gap-2 px-6 py-2 bg-gold-700 hover:bg-gold-500 disabled:bg-gray-400 text-dark-900 font-medium rounded-lg transition-colors"
               >
                 {loading ? 'Processando...' : 'Próximo'}
                 <ArrowRight className="w-4 h-4" />
@@ -435,7 +455,7 @@ export default function ImportLeads() {
               value={singleCity}
               onChange={(e) => setSingleCity(e.target.value)}
               placeholder="Ex: São Paulo, Rio de Janeiro, Joinville..."
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-gold-500"
             />
             <p className="text-xs text-gray-500 mt-2">
               Deixe em branco se quiser preencher depois
@@ -465,14 +485,14 @@ export default function ImportLeads() {
                       placeholder="Telefone"
                       value={telefones[idx] || ''}
                       onChange={(e) => setTelefones({...telefones, [idx]: e.target.value})}
-                      className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gold-500"
                     />
                     <input
                       type="url"
                       placeholder="Site (https://...)"
                       value={sites[idx] || ''}
                       onChange={(e) => setSites({...sites, [idx]: e.target.value})}
-                      className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gold-500"
                     />
                   </div>
                   {telefones[idx] && (
@@ -522,7 +542,7 @@ export default function ImportLeads() {
             </button>
             <button
               onClick={() => setStep(3)}
-              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+              className="flex items-center gap-2 px-6 py-2 bg-gold-700 hover:bg-gold-500 text-dark-900 font-medium rounded-lg transition-colors"
             >
               Próximo
               <ArrowRight className="w-4 h-4" />
@@ -554,7 +574,7 @@ export default function ImportLeads() {
                 <select
                   value={mapping[field.key]}
                   onChange={(e) => setMapping({ ...mapping, [field.key]: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gold-500"
                 >
                   <option value="">Selecione uma coluna...</option>
                   {columns.map((col) => (
@@ -604,7 +624,7 @@ export default function ImportLeads() {
             </button>
             <button
               onClick={() => setStep(3)}
-              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+              className="flex items-center gap-2 px-6 py-2 bg-gold-700 hover:bg-gold-500 text-dark-900 font-medium rounded-lg transition-colors"
             >
               Próximo
               <ArrowRight className="w-4 h-4" />
@@ -620,27 +640,27 @@ export default function ImportLeads() {
             Confirmar importação
           </h2>
 
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6 mb-6">
+          <div className="bg-gold-50 border border-gold-200 rounded-lg p-6 mb-6">
             {isGoogleMaps ? (
               <>
-                <p className="text-indigo-900">
+                <p className="text-gold-900">
                   Você está prestes a importar <strong>{spreadsheetData?.length || 0} negócios</strong> do Google Maps.
                 </p>
                 {singleCity && (
-                  <p className="text-indigo-800 mt-3">
+                  <p className="text-gold-800 mt-3">
                     <strong>Cidade:</strong> {singleCity}
                   </p>
                 )}
               </>
             ) : (
               <>
-                <p className="text-indigo-900">
+                <p className="text-gold-900">
                   Você está prestes a importar <strong>{spreadsheetData?.length || 0} leads</strong> com o seguinte mapeamento:
                 </p>
                 <ul className="mt-4 space-y-2">
                   {Object.entries(mapping).map(([key, col]) => (
                     col && (
-                      <li key={key} className="text-sm text-indigo-800">
+                      <li key={key} className="text-sm text-gold-800">
                         <strong>{key}:</strong> {col}
                       </li>
                     )
@@ -681,11 +701,19 @@ export default function ImportLeads() {
 
           <button
             onClick={handleReset}
-            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+            className="px-6 py-2 bg-gold-700 hover:bg-gold-500 text-dark-900 font-medium rounded-lg transition-colors"
           >
             Importar outro arquivo
           </button>
         </div>
+      )}
+
+      {/* Google Maps Scraper Modal */}
+      {showScraper && (
+        <GoogleMapsScraper
+          onDataScraped={handleScrapedData}
+          onClose={() => setShowScraper(false)}
+        />
       )}
 
     </div>

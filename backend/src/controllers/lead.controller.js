@@ -1,7 +1,6 @@
 const leadService = require('../services/lead.service');
-const { analyzeLeadWithGemini } = require('../services/ai.service');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { analyzeLead, assistLead } = require('../services/ai.service');
+const prisma = require('../lib/prisma');
 
 async function getAll(req, res) {
   try {
@@ -96,7 +95,7 @@ async function analyzeWithAI(req, res) {
     
     if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
 
-    const analysis = await analyzeLeadWithGemini(lead);
+    const analysis = await analyzeLead(lead);
 
     // Formatar análise como texto para registrar na interação
     // Escapar quebras de linha para evitar problemas de JSON
@@ -143,4 +142,47 @@ Prioridade: ${sanitize(analysis.prioridade)} - ${sanitize(analysis.justificativa
   }
 }
 
-module.exports = { getAll, getStats, getById, create, update, delete: deleteLead, importLeads, deleteMultiple, analyzeWithAI };
+async function assistantAI(req, res) {
+  try {
+    const lead = await prisma.lead.findUnique({
+      where: { id: req.params.id },
+      include: { interacoes: { orderBy: { data: 'asc' } } },
+    });
+    
+    if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+
+    const assistencia = await assistLead(lead);
+
+    // Salvar a resposta como uma interação do tipo ia_assistant
+    await prisma.interacao.create({
+      data: {
+        leadId: req.params.id,
+        tipo: 'ia_assistant',
+        conteudo: assistencia,
+        data: new Date(),
+      },
+    });
+
+    // Buscar todas as interações do assistente para retornar o histórico
+    const historico = await prisma.interacao.findMany({
+      where: { leadId: req.params.id, tipo: 'ia_assistant' },
+      orderBy: { data: 'desc' },
+      select: { id: true, conteudo: true, data: true },
+    });
+
+    return res.json({
+      success: true,
+      assistencia,
+      historico: historico.map(h => ({
+        id: h.id,
+        conteudo: h.conteudo,
+        data: h.data,
+      })),
+    });
+  } catch (err) {
+    console.error('[Assistant AI] Erro:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+module.exports = { getAll, getStats, getById, create, update, delete: deleteLead, importLeads, deleteMultiple, analyzeWithAI, assistantAI };

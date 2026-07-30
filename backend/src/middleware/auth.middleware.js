@@ -1,25 +1,10 @@
-const jwt = require('jsonwebtoken');
-
 /**
- * Middleware de autenticação simples
- * Apenas valida o token JWT
+ * Middleware de autenticação - DESATIVADO (modo local/desktop)
+ * Sempre permite acesso com usuário padrão local
  */
 function authMiddleware(req, res, next) {
-  const authHeader = req.headers['authorization'];
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token de autenticação não fornecido' });
-  }
-
-  const token = authHeader.split(' ')[1];
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Token inválido ou expirado' });
-  }
+  req.user = { id: 'local', email: 'local@checkmate.app', nome: 'Usuário Local' };
+  next();
 }
 
 module.exports = authMiddleware;

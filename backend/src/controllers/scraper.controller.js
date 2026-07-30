@@ -1,36 +1,15 @@
 /**
  * Controller de Scraping
  * Endpoints para fazer scrape de dados do Google Maps
- * 
- * ⚠️ IMPORTANTE: Google Maps Scraper está disponível APENAS na versão Desktop (Electron)
- * Na versão Web (Vercel), retorna erro 403 Forbidden
  */
 
 const ScraperService = require('../services/scraper.service');
 
 class ScraperController {
   /**
-   * Middleware: Verificar se scraper está habilitado (apenas Electron/Desktop)
+   * Middleware: Verificar se scraper está habilitado
    */
   static checkScraperEnabled(req, res, next) {
-    const isElectron = process.env.IS_ELECTRON === 'true';
-    
-    console.log('[ScraperController] Verificando acesso ao scraper:');
-    console.log('[ScraperController]   IS_ELECTRON env var:', process.env.IS_ELECTRON);
-    console.log('[ScraperController]   isElectron boolean:', isElectron);
-    console.log('[ScraperController]   Acesso permitido:', isElectron);
-    
-    if (!isElectron) {
-      console.log('[ScraperController] ❌ Acesso negado - não é Electron');
-      return res.status(403).json({
-        success: false,
-        error: 'Google Maps Scraper não disponível nesta versão',
-        message: 'Este recurso está disponível apenas na versão Desktop (Electron)',
-        tip: 'Use a versão desktop em check-crm.app/download ou acesse a versão web em check-crm.vercel.app'
-      });
-    }
-    
-    console.log('[ScraperController] ✓ Acesso permitido - Electron detectado');
     next();
   }
 

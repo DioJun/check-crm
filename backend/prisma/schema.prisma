@@ -1,12 +1,10 @@
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-1.0.x", "linux-musl-openssl-3.0.x"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model Usuario {
@@ -18,23 +16,30 @@ model Usuario {
 }
 
 model Lead {
-  id              String   @id @default(uuid())
-  nome            String
-  telefone        String?
-  cidade          String?
-  servico         String?
-  status          String   @default("novo")
-  origem          String?
-  dataEntrada     DateTime @default(now())
-  ultimaInteracao DateTime?
-  avaliacao       String?
-  reviews         String?
-  temWhatsapp     Boolean?
-  temSite         Boolean?
-  site            String?
-  aiAnalysis      String?
-  aiAnalysisAt    DateTime?
-  interacoes      Interacao[]
+  id                String   @id @default(uuid())
+  nome              String
+  telefone          String?
+  cidade            String?
+  servico           String?
+  status            String   @default("novo")
+  origem            String?
+  dataEntrada       DateTime @default(now())
+  ultimaInteracao   DateTime?
+  avaliacao         String?
+  reviews           String?
+  temWhatsapp       Boolean?
+  temSite           Boolean?
+  site              String?
+  googleMapsRating  String?  // Alto, Medio, Baixo, NaoTem
+  hasProduct        Boolean? // Já tem produto/serviço digital
+  instagram         String?  // @usuario
+  instagramQuality  String?  // Bom, Medio, Ruim, NaoTem
+  observacoes       String?  // Anotações livres
+  porte             String?  // Pequeno, Medio, Grande
+  tempoMercado      String?  // Menos1ano, 1a3anos, 3a5anos, Mais5anos
+  aiAnalysis        String?
+  aiAnalysisAt      DateTime?
+  interacoes        Interacao[]
 }
 
 model Interacao {

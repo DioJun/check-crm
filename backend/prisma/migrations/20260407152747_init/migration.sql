@@ -22,7 +22,16 @@ CREATE TABLE "Lead" (
     "reviews" TEXT,
     "temWhatsapp" BOOLEAN,
     "temSite" BOOLEAN,
-    "site" TEXT
+    "site" TEXT,
+    "aiAnalysis" TEXT,
+    "aiAnalysisAt" DATETIME,
+    "googleMapsRating" TEXT,
+    "hasProduct" BOOLEAN,
+    "instagram" TEXT,
+    "instagramQuality" TEXT,
+    "observacoes" TEXT,
+    "porte" TEXT,
+    "tempoMercado" TEXT
 );
 
 -- CreateTable

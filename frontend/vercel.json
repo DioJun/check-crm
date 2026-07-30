@@ -1,6 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://check-crm.vercel.app/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}

@@ -21,5 +21,6 @@ router.put('/:id', leadController.update);
 router.delete('/:id', leadController.delete);
 router.delete('/', leadController.deleteMultiple);
 router.post('/:id/analyze', leadController.analyzeWithAI);
+router.post('/:id/assistant', leadController.assistantAI);
 
 module.exports = router;

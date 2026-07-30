@@ -122,7 +122,7 @@ export default function Leads() {
     setPage(1);
   }, [search, filterStatus, filterCidade, filterServico]);
 
-  const selectClass = 'border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white';
+  const selectClass = 'border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 bg-white';
 
   return (
     <div>
@@ -151,7 +151,7 @@ export default function Leads() {
           </button>
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-gold-700 hover:bg-gold-500 text-dark-900 font-medium text-sm rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
             Novo Lead
@@ -169,7 +169,7 @@ export default function Leads() {
               placeholder="Buscar por nome..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold-500"
             />
           </div>
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectClass}>
@@ -191,7 +191,7 @@ export default function Leads() {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-700" />
           </div>
         ) : error ? (
           <div className="p-6 text-red-600">{error}</div>
@@ -219,7 +219,7 @@ export default function Leads() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {paginated.map((lead) => (
-                  <tr key={lead.id} className={`transition-colors ${selected.has(lead.id) ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}>
+                  <tr key={lead.id} className={`transition-colors ${selected.has(lead.id) ? 'bg-gold-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
@@ -240,14 +240,14 @@ export default function Leads() {
                         <WhatsAppButton telefone={lead.telefone} nome={lead.nome} />
                         <button
                           onClick={() => handleEdit(lead)}
-                          className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-500 hover:text-gold-700 hover:bg-gold-50 rounded-lg transition-colors"
                           title="Editar"
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => navigate(`/leads/${lead.id}`)}
-                          className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-500 hover:text-gold-700 hover:bg-gold-50 rounded-lg transition-colors"
                           title="Visualizar"
                         >
                           <Eye className="w-4 h-4" />

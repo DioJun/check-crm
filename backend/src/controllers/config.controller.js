@@ -11,7 +11,7 @@ class ConfigController {
   static getEnvironment(req, res) {
     const isElectron = process.env.IS_ELECTRON === 'true';
     const isProd = process.env.NODE_ENV === 'production';
-    const dbProvider = process.env.DATABASE_PROVIDER || 'postgresql';
+    const dbProvider = process.env.DATABASE_PROVIDER || 'sqlite';
 
     console.log('[ConfigController] Environment check:');
     console.log('[ConfigController]   IS_ELECTRON env var:', process.env.IS_ELECTRON);
@@ -42,23 +42,16 @@ class ConfigController {
    * Retorna quais funcionalidades estão disponíveis
    */
   static getCapabilities(req, res) {
-    const isElectron = process.env.IS_ELECTRON === 'true';
-
     return res.json({
       success: true,
       capabilities: {
-        desktop: isElectron ? {
+        desktop: {
           enabled: true,
-          features: ['Google Maps Scraper', 'Local Database', 'Offline Mode', 'AI Analysis'],
+          features: ['Google Maps Scraper', 'Local Database', 'AI Analysis'],
           platform: process.platform,
           appVersion: process.env.APP_VERSION || '1.0.0',
-        } : null,
-        web: !isElectron ? {
-          enabled: true,
-          features: ['Cloud Database', 'Team Collaboration', 'AI Analysis', 'Import/Export'],
-          deployment: 'Vercel',
-        } : null,
-        shared: [
+        },
+        features: [
           'Lead Management',
           'Pipeline Kanban',
           'AI Analysis with Gemini',

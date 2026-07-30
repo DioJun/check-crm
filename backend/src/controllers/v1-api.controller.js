@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { onLeadCreated, onLeadUpdated, onLeadDeleted } = require('../services/webhook.service');
-const prisma = new PrismaClient();
 
 /**
  * GET /api/v1/leads
@@ -14,9 +13,9 @@ const listLeads = async (req, res) => {
     if (status) where.status = status;
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search, mode: 'insensitive' } }
+        { nome: { contains: search } },
+        { telefone: { contains: search } },
+        { cidade: { contains: search } }
       ];
     }
 
@@ -25,18 +24,20 @@ const listLeads = async (req, res) => {
         where,
         take: Math.min(parseInt(limit), 100),
         skip: parseInt(offset),
-        orderBy: { createdAt: 'desc' },
+        orderBy: { dataEntrada: 'desc' },
         select: {
           id: true,
-          name: true,
-          email: true,
-          phone: true,
-          company: true,
+          nome: true,
+          telefone: true,
+          cidade: true,
+          servico: true,
           status: true,
-          source: true,
-          value: true,
-          createdAt: true,
-          updatedAt: true
+          origem: true,
+          dataEntrada: true,
+          ultimaInteracao: true,
+          avaliacao: true,
+          temWhatsapp: true,
+          site: true
         }
       }),
       prisma.lead.count({ where })
@@ -72,8 +73,8 @@ const getLead = async (req, res) => {
     const lead = await prisma.lead.findUnique({
       where: { id },
       include: {
-        interactions: {
-          orderBy: { createdAt: 'desc' },
+        interacoes: {
+          orderBy: { data: 'desc' },
           take: 10
         }
       }
@@ -105,24 +106,23 @@ const getLead = async (req, res) => {
  */
 const createLead = async (req, res) => {
   try {
-    const { name, email, phone, company, status = 'prospect', source, value } = req.body;
+    const { nome, telefone, cidade, servico, status = 'novo', origem = 'api' } = req.body;
 
-    if (!name) {
+    if (!nome) {
       return res.status(400).json({
         success: false,
-        error: 'Field "name" is required'
+        error: 'Field "nome" is required'
       });
     }
 
     const lead = await prisma.lead.create({
       data: {
-        name,
-        email: email || null,
-        phone: phone || null,
-        company: company || null,
+        nome,
+        telefone: telefone || null,
+        cidade: cidade || null,
+        servico: servico || null,
         status,
-        source: source || 'api',
-        value: value ? parseFloat(value) : null
+        origem
       }
     });
 
@@ -152,21 +152,25 @@ const updateLead = async (req, res) => {
     const updateData = {};
 
     // Whitelist de campos atualizáveis
-    const allowedFields = ['name', 'email', 'phone', 'company', 'status', 'value'];
+    const allowedFields = ['nome', 'telefone', 'cidade', 'servico', 'status', 'origem', 'avaliacao', 'temWhatsapp', 'temSite', 'site'];
     allowedFields.forEach(field => {
       if (field in req.body) {
         updateData[field] = req.body[field];
       }
     });
 
-    if (updateData.value) {
-      updateData.value = parseFloat(updateData.value);
+    // Atualizar última interação
+    if (Object.keys(updateData).length > 0) {
+      updateData.ultimaInteracao = new Date();
     }
 
     const lead = await prisma.lead.update({
       where: { id },
       data: updateData
     });
+
+    // Trigger webhook asynchronously
+    onLeadUpdated(lead).catch(err => console.error('[Webhook Error]', err));
 
     res.json({
       success: true,
