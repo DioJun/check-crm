@@ -5,8 +5,8 @@
 
 const express = require('express');
 const router = express.Router();
-const ScraperController = require('../controllers/scraper.controller');
-const authMiddleware = require('../middleware/auth.middleware');
+const ScraperController = require('./scraper.controller');
+const authMiddleware = require('../../core/middleware/auth.middleware');
 
 /**
  * GET /scraper/health

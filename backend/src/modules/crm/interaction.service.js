@@ -1,5 +1,5 @@
-const interactionRepository = require('../repositories/interaction.repository');
-const leadRepository = require('../repositories/lead.repository');
+const interactionRepository = require('./interaction.repository');
+const leadRepository = require('./lead.repository');
 
 async function getByLeadId(leadId) {
   return interactionRepository.findByLeadId(leadId);

@@ -1,4 +1,4 @@
-const prisma = require('../lib/prisma');
+const prisma = require('../../core/lib/prisma');
 
 async function findAll(filters = {}) {
   const where = {};

@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const leadController = require('../controllers/lead.controller');
-const spreadsheetController = require('../controllers/spreadsheet.controller');
-const authMiddleware = require('../middleware/auth.middleware');
+const leadController = require('./lead.controller');
+const spreadsheetController = require('./spreadsheet.controller');
+const authMiddleware = require('../../core/middleware/auth.middleware');
 
 router.use(authMiddleware);
 

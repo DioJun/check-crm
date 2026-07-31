@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const apiKeyAuth = require('../middleware/apikey.middleware');
+const apiKeyAuth = require('../../core/middleware/apikey.middleware');
 const { 
   listLeads, 
   getLead, 
   createLead, 
   updateLead, 
   deleteLead 
-} = require('../controllers/v1-api.controller');
+} = require('./v1-api.controller');
 
 /**
  * API v1 - Rotas públicas com autenticação por API Key

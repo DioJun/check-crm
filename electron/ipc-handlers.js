@@ -186,3 +186,27 @@ ipcMain.handle('get-db-path', async () => {
   const dbPath = path.join(__dirname, '../backend/dev.db');
   return { path: dbPath, exists: fs.existsSync(dbPath) };
 });
+
+// ==================== WHATSAPP BRIDGE ====================
+const { getBridgeScript } = require('./whatsapp-bridge');
+
+// Retorna o script de injeção do DOM do WhatsApp para o frontend
+ipcMain.handle('whatsapp:get-bridge-script', async () => {
+  return getBridgeScript();
+});
+
+// Registra ações do assistente no log (segurança/auditoria)
+ipcMain.handle('whatsapp:log-action', async (event, action) => {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    ...(typeof action === 'object' ? action : { message: String(action) }),
+  };
+  try {
+    const logPath = path.join(__dirname, '../whatsapp-assistant.log');
+    fs.appendFileSync(logPath, JSON.stringify(entry) + '\n', 'utf-8');
+  } catch (err) {
+    console.error('[WhatsApp Log]', err.message);
+  }
+  console.log('[WhatsApp Action]', JSON.stringify(entry));
+  return { success: true };
+});

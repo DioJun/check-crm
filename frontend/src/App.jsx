@@ -6,6 +6,7 @@ import Leads from './pages/Leads';
 import LeadDetail from './pages/LeadDetail';
 import ImportLeads from './pages/ImportLeads';
 import Pipeline from './pages/Pipeline';
+import WhatsAppAssistant from './pages/WhatsAppAssistant';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/leads/:id" element={<Layout><LeadDetail /></Layout>} />
           <Route path="/import-leads" element={<Layout><ImportLeads /></Layout>} />
           <Route path="/pipeline" element={<Layout><Pipeline /></Layout>} />
+          <Route path="/whatsapp" element={<Layout><WhatsAppAssistant /></Layout>} />
         </Routes>
       </AuthProvider>
     </HashRouter>

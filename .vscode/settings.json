@@ -33,6 +33,7 @@
         "/^node -e \"const repo = require\\('\\./src/repositories/lead\\.repository'\\); console\\.log\\('✓ Repository OK, functions:', Object\\.keys\\(repo\\)\\.join\\(', '\\)\\)\"$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "Move-Item": true
     }
 }

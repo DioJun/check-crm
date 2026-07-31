@@ -3,7 +3,7 @@
  * Endpoints para fazer scrape de dados do Google Maps
  */
 
-const ScraperService = require('../services/scraper.service');
+const ScraperService = require('./scraper.service');
 
 class ScraperController {
   /**

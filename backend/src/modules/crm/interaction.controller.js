@@ -1,4 +1,4 @@
-const interactionService = require('../services/interaction.service');
+const interactionService = require('./interaction.service');
 
 async function getByLeadId(req, res) {
   try {

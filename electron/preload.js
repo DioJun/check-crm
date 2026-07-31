@@ -35,4 +35,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Sistema
   getVersion: () => ipcRenderer.invoke('get-version'),
   getDatabasePath: () => ipcRenderer.invoke('get-db-path'),
+  
+  // WhatsApp Bridge
+  getWhatsAppBridgeScript: () => ipcRenderer.invoke('whatsapp:get-bridge-script'),
+  logWhatsAppAction: (action) => ipcRenderer.invoke('whatsapp:log-action', action),
 });

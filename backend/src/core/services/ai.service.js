@@ -340,4 +340,72 @@ Suas características:
   return raw;
 }
 
-module.exports = { analyzeLead, analyzeLeadWithGemini, analyzeLeadWithDeepSeek, assistLead };
+// ==================== ASSISTENTE DE WHATSAPP ====================
+// Analisa a conversa do WhatsApp em tempo real, classifica o lead,
+// sugere uma resposta e recomenda atualizações do perfil no CRM.
+// ⚠️ NUNCA envia mensagens — apenas analisa e sugere.
+async function suggestResponse(chatName, messages) {
+  const conversaTexto = messages && messages.length > 0
+    ? messages.map((m) => `[${m.from === 'lead' ? 'LEAD' : 'VENDEDOR'}]${m.time ? ` (${m.time})` : ''}: ${m.text}`).join('\n')
+    : 'Conversa ainda vazia ou sem mensagens legíveis.';
+
+  const prompt = `Você é o melhor assistente de vendas do WhatsApp do mundo, especialista em conversas de vendas consultivas.
+
+## SEU TRABALHO (apenas analisar e sugerir — VOCÊ NÃO ENVIA MENSAGENS):
+Analise a conversa abaixo com o lead "${chatName}" e gere:
+1. CLASSIFICAÇÃO do lead no momento
+2. UMA SUGESTÃO de resposta (que o VENDEDOR vai copiar e colar/enviar manualmente)
+3. RECOMENDAÇÃO de atualização do perfil no CRM (a ser aplicada automaticamente)
+4. RESUMO curto da conversa para o histórico do CRM
+
+## REGRAS:
+- A sugestão deve ser natural, consultiva, amigável e profissional (tom de conversa real)
+- Se o lead fez uma pergunta, responda de forma clara e útil
+- Identifique objeções e enderece-as com empatia
+- NUNCA pressione para vender — foco em entender e ajudar
+- Responda SOMENTE com JSON válido, sem markdown, sem texto extra
+
+CONVERSA ATUAL:
+${conversaTexto}
+
+Retorne EXATAMENTE este JSON:
+{
+  "classificacao": "interessado | frio | objecao | pronto_fechar | neutro",
+  "sentimento": "positivo | neutro | negativo",
+  "sugestao": "A sugestão de resposta que o vendedor deve enviar (3-6 frases, personalizada para esta conversa, pronta para copiar)",
+  "resumoConversa": "Resumo curto (1-2 frases) da conversa para o histórico do CRM",
+  "atualizacaoLead": {
+    "status": "status sugerido (novo | contatado | interessado | fechado | sem_contato) — escolha o que fizer mais sentido, ou null para não mudar",
+    "observacoes": "Nova observação/anotação a acrescentar (baseada no que o lead disse), ou null",
+    "interesse": "nota curta sobre o nível de interesse detectado, ou null"
+  }
+}`;
+
+  const systemMessage = `Você é o assistente de vendas do WhatsApp de uma plataforma de CRM.
+- Analisa conversas reais do WhatsApp e gera sugestões de resposta
+- Classifica leads com precisão (interessado, frio, objeção, pronto para fechar, neutro)
+- NUNCA envia mensagens automaticamente — apenas sugere para o vendedor
+- Gera JSON estruturado para atualizar o CRM automaticamente
+- Escreve em português brasileiro natural e consultivo`;
+
+  const raw = await callAI(prompt, systemMessage);
+
+  // Tentar parse do JSON
+  try {
+    const parsed = JSON.parse(
+      raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+    );
+    return parsed;
+  } catch (err) {
+    // Se a IA retornou texto livre em vez de JSON, retornar fallback
+    return {
+      classificacao: 'neutro',
+      sentimento: 'neutro',
+      sugestao: raw,
+      resumoConversa: `Conversa com ${chatName} analisada pelo assistente.`,
+      atualizacaoLead: { status: null, observacoes: null, interesse: null },
+    };
+  }
+}
+
+module.exports = { analyzeLead, analyzeLeadWithGemini, analyzeLeadWithDeepSeek, assistLead, suggestResponse };

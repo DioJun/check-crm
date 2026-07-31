@@ -1,5 +1,5 @@
-const leadRepository = require('../repositories/lead.repository');
-const { normalizarTelefone } = require('./phone.service');
+const leadRepository = require('./lead.repository');
+const { normalizarTelefone } = require('../../core/services/phone.service');
 
 async function getAll(filters) {
   return leadRepository.findAll(filters);

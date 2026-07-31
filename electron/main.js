@@ -1,7 +1,8 @@
-const { app, BrowserWindow, Menu, session, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, session, ipcMain, dialog, webContents } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const { setupWhatsAppBridge } = require('./whatsapp-bridge');
 
 let mainWindow;
 let backendProcess;
@@ -10,20 +11,40 @@ function getBackendPath() {
   return path.join(__dirname, '..', 'backend');
 }
 
+// Configurar partição persistente para o WhatsApp Web (mantém login por QR)
+function setupWhatsAppSession() {
+  const whatsappSession = session.fromPartition('persist:whatsapp');
+  // Permitir acessos ao WhatsApp Web
+  whatsappSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowed = ['notifications', 'media', 'fullscreen'];
+    callback(allowed.includes(permission));
+  });
+  return whatsappSession;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: 1500,
+    height: 950,
     minWidth: 1000,
     minHeight: 700,
-    title: 'Checkmate - CRM',
+    title: 'Checkmate - Plataforma',
     icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       enableRemoteModule: false,
       nodeIntegration: false,
+      webviewTag: true, // Habilita <webview> para o WhatsApp Web
     },
+  });
+
+  // Preparar sessão persistente do WhatsApp
+  setupWhatsAppSession();
+
+  // Quando um <webview> for anexado, configurar a bridge de leitura
+  mainWindow.webContents.on('did-attach-webview', (event, webContents) => {
+    setupWhatsAppBridge(webContents);
   });
 
   // Configurar CSP para evitar warning de segurança

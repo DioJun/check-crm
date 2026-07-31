@@ -1,5 +1,5 @@
-const prisma = require('../lib/prisma');
-const { onLeadCreated, onLeadUpdated, onLeadDeleted } = require('../services/webhook.service');
+const prisma = require('../../core/lib/prisma');
+const { onLeadCreated, onLeadUpdated, onLeadDeleted } = require('../../core/services/webhook.service');
 
 /**
  * GET /api/v1/leads

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const interactionController = require('../controllers/interaction.controller');
-const authMiddleware = require('../middleware/auth.middleware');
+const interactionController = require('./interaction.controller');
+const authMiddleware = require('../../core/middleware/auth.middleware');
 
 router.use(authMiddleware);
 

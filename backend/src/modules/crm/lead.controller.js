@@ -1,6 +1,6 @@
-const leadService = require('../services/lead.service');
-const { analyzeLead, assistLead } = require('../services/ai.service');
-const prisma = require('../lib/prisma');
+const leadService = require('./lead.service');
+const { analyzeLead, assistLead } = require('../../core/services/ai.service');
+const prisma = require('../../core/lib/prisma');
 
 async function getAll(req, res) {
   try {

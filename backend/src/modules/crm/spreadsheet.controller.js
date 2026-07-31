@@ -1,7 +1,7 @@
 const multer = require('multer');
 const XLSX = require('xlsx');
-const leadService = require('../services/lead.service');
-const { normalizarTelefone } = require('../services/phone.service');
+const leadService = require('./lead.service');
+const { normalizarTelefone } = require('../../core/services/phone.service');
 
 // Configurar multer para aceitar apenas xlsx e csv
 const upload = multer({
@@ -307,7 +307,7 @@ async function checkDuplicates(req, res) {
     
     let existingLeads = [];
     if (telefonesComValor.length > 0) {
-      const prisma = require('../lib/prisma');
+      const prisma = require('../../core/lib/prisma');
       existingLeads = await prisma.lead.findMany({
         where: { telefone: { in: telefonesComValor } },
         select: { id: true, nome: true, telefone: true }
