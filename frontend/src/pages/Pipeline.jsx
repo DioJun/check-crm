@@ -141,7 +141,6 @@ export default function Pipeline() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [viewedLead, setViewedLead] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -173,7 +172,6 @@ export default function Pipeline() {
 
     setUpdatingStatus(true);
     try {
-      const oldStatus = selectedLead.status;
       
       // Optimistic update
       setLeads((prev) =>
@@ -197,15 +195,12 @@ export default function Pipeline() {
       return;
     }
 
-    setDeletingId(lead.id);
     try {
       await api.delete(`/leads/${lead.id}`);
       setLeads((prev) => prev.filter((l) => l.id !== lead.id));
       setError('');
     } catch (err) {
       setError(`Erro ao deletar lead: ${err.response?.data?.error || err.message}`);
-    } finally {
-      setDeletingId(null);
     }
   }
 

@@ -14,7 +14,7 @@ const INITIAL_FORM = {
   origem: '',
 };
 
-export default function LeadModal({ lead, onClose, onSuccess }) {
+export default function LeadModal({ lead, initialForm, onClose, onSuccess }) {
   const isEdit = Boolean(lead);
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
@@ -30,10 +30,12 @@ export default function LeadModal({ lead, onClose, onSuccess }) {
         status: lead.status || 'novo',
         origem: lead.origem || '',
       });
+    } else if (initialForm) {
+      setForm({ ...INITIAL_FORM, ...initialForm });
     } else {
       setForm(INITIAL_FORM);
     }
-  }, [lead]);
+  }, [lead, initialForm]);
 
   function handleChange(e) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));

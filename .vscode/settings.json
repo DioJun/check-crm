@@ -34,6 +34,7 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "Move-Item": true
+        "Move-Item": true,
+        "npx eslint": true
     }
 }

@@ -12,13 +12,55 @@ function getBackendPath() {
 }
 
 // Configurar partição persistente para o WhatsApp Web (mantém login por QR)
+// ⚠️ O WhatsApp Web exige um User-Agent de Chrome moderno.
+// Mesmo com Chromium atual, o webview envia um UA que o WhatsApp pode considerar
+// antigo/desconhecido — por isso forçamos um UA de Chrome real e removemos os
+// client hints (Sec-CH-UA) que denunciariam a versão real do Electron.
+const WHATSAPP_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36';
+
 function setupWhatsAppSession() {
   const whatsappSession = session.fromPartition('persist:whatsapp');
-  // Permitir acessos ao WhatsApp Web
+
+  // Força o User-Agent no nível da sessão (afeta navigator.userAgent da página)
+  whatsappSession.setUserAgent(WHATSAPP_USER_AGENT);
+
+  // Sobrescreve o header User-Agent e remove client hints em todas as requisições
+  whatsappSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const headers = details.requestHeaders || {};
+    headers['User-Agent'] = WHATSAPP_USER_AGENT;
+    delete headers['Sec-CH-UA'];
+    delete headers['Sec-CH-UA-Platform'];
+    delete headers['Sec-CH-UA-Mobile'];
+    delete headers['Sec-CH-UA-Platform-Version'];
+    delete headers['Sec-CH-UA-Full-Version-List'];
+    delete headers['Sec-CH-UA-Bitness'];
+    delete headers['Sec-CH-UA-Arch'];
+    callback({ requestHeaders: headers });
+  });
+
+  // Permitir acessos ao WhatsApp Web.
+  // 'persistent-storage' é essencial: sem ela o WhatsApp não consegue gravar
+  // o IndexedDB/Cache persistente e aparece o erro
+  // "[storage] storage bucket persistence denied (acquire-persistent-storage-denied)".
   whatsappSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    const allowed = ['notifications', 'media', 'fullscreen'];
+    const allowed = [
+      'notifications',
+      'media',
+      'fullscreen',
+      'persistent-storage',
+      'clipboard-sanitized-write',
+      'clipboard-read',
+    ];
     callback(allowed.includes(permission));
   });
+
+  // Síncrono: checagens que não passam pelo request handler (ex.: fullscreen)
+  whatsappSession.setPermissionCheckHandler((webContents, permission) => {
+    const allowed = ['notifications', 'media', 'fullscreen', 'persistent-storage'];
+    return allowed.includes(permission);
+  });
+
   return whatsappSession;
 }
 
@@ -48,12 +90,13 @@ function createWindow() {
   });
 
   // Configurar CSP para evitar warning de segurança
+  // frame-src inclui o backend local (3001) pois o preview do site de demo é um iframe
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:3001 ws://localhost:5173; font-src 'self' data:;"
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:3001 ws://localhost:5173; font-src 'self' data:; frame-src 'self' http://localhost:3001;"
         ]
       }
     });

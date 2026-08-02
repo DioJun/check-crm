@@ -344,25 +344,41 @@ Suas características:
 // Analisa a conversa do WhatsApp em tempo real, classifica o lead,
 // sugere uma resposta e recomenda atualizações do perfil no CRM.
 // ⚠️ NUNCA envia mensagens — apenas analisa e sugere.
-async function suggestResponse(chatName, messages) {
+async function suggestResponse(chatName, messages, options = {}) {
   const conversaTexto = messages && messages.length > 0
     ? messages.map((m) => `[${m.from === 'lead' ? 'LEAD' : 'VENDEDOR'}]${m.time ? ` (${m.time})` : ''}: ${m.text}`).join('\n')
     : 'Conversa ainda vazia ou sem mensagens legíveis.';
 
+  // CAMADA 1 — Injetar perfil comportamental do lead (se disponível)
+  const perfilSection = options.profileSection || '';
+  // CAMADA 2 — Injetar preferências aprendidas do vendedor (se disponível)
+  const paramsSection = options.paramsSection || '';
+  // CAMADA 3 — Injetar contexto da base de conhecimento (RAG)
+  const ragSection = options.ragSection || '';
+  // CAMADA 4 — Injetar insights globais (se disponíveis)
+  const insightsSection = options.insightsSection || '';
+
   const prompt = `Você é o melhor assistente de vendas do WhatsApp do mundo, especialista em conversas de vendas consultivas.
 
 ## SEU TRABALHO (apenas analisar e sugerir — VOCÊ NÃO ENVIA MENSAGENS):
+Você ajuda um VENDEDOR que está fazendo PROSPECÇÃO ATIVA: ele vai ATÉ o lead (dono de pequeno negócio) para oferecer OS SERVIÇOS DELE. Os serviços do vendedor incluem: criação de site profissional, marketing digital, gestão de tráfego, desenvolvimento de software e CRM. O vendedor pode estar conversando com um lead que ainda não conhece os serviços — cabe a ele apresentar valor de forma consultiva e natural.
+
 Analise a conversa abaixo com o lead "${chatName}" e gere:
-1. CLASSIFICAÇÃO do lead no momento
+1. CLASSIFICAÇÃO do lead no momento (interessado, frio, objeção, pronto para fechar ou neutro)
 2. UMA SUGESTÃO de resposta (que o VENDEDOR vai copiar e colar/enviar manualmente)
 3. RECOMENDAÇÃO de atualização do perfil no CRM (a ser aplicada automaticamente)
 4. RESUMO curto da conversa para o histórico do CRM
 
+${perfilSection ? `## MEMÓRIA DO LEAD (use para personalizar)\n${perfilSection}\n` : ''}
+${paramsSection ? `${paramsSection}\n` : ''}
+${ragSection ? `${ragSection}\n` : ''}
+${insightsSection ? `${insightsSection}\n` : ''}
 ## REGRAS:
 - A sugestão deve ser natural, consultiva, amigável e profissional (tom de conversa real)
+- LEMBRE-SE: o vendedor PROCUROU este lead para oferecer os serviços dele. A sugestão deve avançar a conversa nesse sentido — apresentando valor, criando conexão com o negócio do lead e conduzindo para uma oferta relevante (site, marketing, tráfego, software ou CRM) de forma natural, sem pressão
 - Se o lead fez uma pergunta, responda de forma clara e útil
 - Identifique objeções e enderece-as com empatia
-- NUNCA pressione para vender — foco em entender e ajudar
+- NUNCA pressione para vender — foco em entender, ajudar e SEMEAR o interesse pelos serviços
 - Responda SOMENTE com JSON válido, sem markdown, sem texto extra
 
 CONVERSA ATUAL:
@@ -408,4 +424,4 @@ Retorne EXATAMENTE este JSON:
   }
 }
 
-module.exports = { analyzeLead, analyzeLeadWithGemini, analyzeLeadWithDeepSeek, assistLead, suggestResponse };
+module.exports = { analyzeLead, analyzeLeadWithGemini, analyzeLeadWithDeepSeek, assistLead, suggestResponse, callAI };

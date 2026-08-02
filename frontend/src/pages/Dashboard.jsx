@@ -16,7 +16,8 @@ const STATUS_LABELS = {
   fechado: 'Fechado',
 };
 
-function StatCard({ label, value, icon: Icon, color }) {
+function StatCard({ label, value, icon, color }) {
+  const Icon = icon;
   const colorMap = {
     blue: 'bg-blue-500',
     green: 'bg-green-500',

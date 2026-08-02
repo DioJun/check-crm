@@ -18,21 +18,42 @@ const BRIDGE_SCRIPT = `
     chatList: [],
   };
 
-  // ---- Helpers de extração do DOM ----
+  // ---- Helpers de extração do DOM (robustos p/ versões 2024-2026 do WA Web) ----
   function getChatTitle() {
-    const el = document.querySelector('header span[title]')
-      || document.querySelector('[data-testid="conversation-title"]');
-    return el ? (el.getAttribute('title') || el.textContent || '').trim() : null;
+    // Vários seletores fallback (o DOM do WhatsApp muda entre versões)
+    const selectors = [
+      'header span[title]',
+      '[data-testid="conversation-title"]',
+      'header span[dir="auto"]',
+      '[data-testid="conversation-info-header"]',
+      'header div[role="button"] > div > div > span',
+      'header h1',
+      'header h2',
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const t = (el.getAttribute('title') || el.getAttribute('aria-label') || el.textContent || '').trim();
+      if (t) return t;
+    }
+    return null;
   }
 
   function readMessages() {
     const title = getChatTitle();
     const messages = [];
-    const nodes = document.querySelectorAll('div.message-in, div.message-out');
+    // Seletores de mensagens com fallback (message-in/out mudou em algumas versões)
+    const nodes = document.querySelectorAll(
+      'div.message-in, div.message-out, div[data-testid="msg-container"]'
+    );
     nodes.forEach((msg) => {
-      const textEl = msg.querySelector('span.selectable-text');
+      const textEl = msg.querySelector('span.selectable-text')
+        || msg.querySelector('div.copyable-text')
+        || msg.querySelector('span[dir="auto"]');
       if (!textEl || !textEl.innerText) return;
-      const isIncoming = msg.classList.contains('message-in');
+      const isIncoming = msg.classList.contains('message-in')
+        || (msg.dataset && String(msg.dataset.testid || '').toLowerCase().includes('incoming'))
+        || !!msg.querySelector('[data-testid="msg-in"]');
       const timeEl = msg.querySelector('span[data-testid="msg-time"], time');
       const fromEl = msg.querySelector('[data-pre-plain-text]');
       let time = timeEl ? timeEl.getAttribute('title') || timeEl.textContent : '';

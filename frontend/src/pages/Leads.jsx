@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search, Eye, Pencil, ChevronLeft, ChevronRight, Upload, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -15,11 +15,13 @@ function formatDate(dateStr) {
 
 export default function Leads() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editLead, setEditLead] = useState(null);
+  const [initialForm, setInitialForm] = useState(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -38,6 +40,21 @@ export default function Leads() {
   useEffect(() => {
     fetchLeads();
   }, []);
+
+  // Se chegou com ?nome= (ex: do WhatsAppAssistant "Cadastrar como novo lead"),
+  // abre o modal de criação já preenchido
+  useEffect(() => {
+    const nome = searchParams.get('nome');
+    if (nome) {
+      setEditLead(null);
+      setInitialForm({
+        nome,
+        telefone: searchParams.get('telefone') || '',
+        origem: searchParams.get('origem') || 'whatsapp',
+      });
+      setModalOpen(true);
+    }
+  }, [searchParams]);
 
   async function fetchLeads() {
     setLoading(true);
@@ -290,7 +307,8 @@ export default function Leads() {
       {modalOpen && (
         <LeadModal
           lead={editLead}
-          onClose={() => setModalOpen(false)}
+          initialForm={initialForm}
+          onClose={() => { setModalOpen(false); setInitialForm(null); }}
           onSuccess={handleModalSuccess}
         />
       )}

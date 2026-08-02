@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MessageSquare, Phone, StickyNote, ExternalLink, Edit2, Check, X, Sparkles, RefreshCw, Copy, Bot, MessageCircle, Lightbulb, Clock, Target, BarChart, ChevronDown } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Phone, StickyNote, ExternalLink, Edit2, Check, X, Sparkles, RefreshCw, Copy, Bot, MessageCircle, Lightbulb, Clock, Target, BarChart, ChevronDown, Globe } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/ui/StatusBadge';
 import WhatsAppButton from '../components/ui/WhatsAppButton';
@@ -58,7 +58,7 @@ export default function LeadDetail() {
 
   // AI Assistant
   const [assistantLoading, setAssistantLoading] = useState(false);
-  const [assistantResponse, setAssistantResponse] = useState('');
+  const [, setAssistantResponse] = useState('');
   const [assistantHistory, setAssistantHistory] = useState([]);
   const [assistantExpanded, setAssistantExpanded] = useState(null); // id do item expandido
   const [aiError, setAiError] = useState('');
@@ -234,7 +234,17 @@ export default function LeadDetail() {
             <h1 className="text-xl font-bold text-gray-900">{lead?.nome}</h1>
             <p className="text-gray-500 text-sm mt-0.5">{lead?.telefone}</p>
           </div>
-          <WhatsAppButton telefone={lead?.telefone} nome={lead?.nome} />
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => navigate(`/sites/novo?leadId=${id}`)}
+              className="flex items-center gap-1.5 text-sm bg-dark-900 hover:bg-dark-700 text-white font-medium rounded-lg px-3 py-2 transition"
+              title="Criar site de demonstração para este lead"
+            >
+              <Globe className="w-4 h-4" />
+              Site de amostra
+            </button>
+            <WhatsAppButton telefone={lead?.telefone} nome={lead?.nome} />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">

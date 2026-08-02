@@ -11,12 +11,14 @@
 const crmModule = require('../modules/crm');
 const prospectionModule = require('../modules/prospection');
 const whatsappModule = require('../modules/whatsapp');
+const sitesModule = require('../modules/sites');
 
 // Lista central de módulos registrados
 const MODULES = [
   crmModule,
   prospectionModule,
   whatsappModule,
+  sitesModule,
 ];
 
 /**

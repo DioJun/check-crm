@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Kanban, X, Menu, Upload, ChevronDown, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Users, Kanban, X, Menu, Upload, ChevronDown, MessageSquare, BookOpen, BarChart3, Settings, Globe, PlusCircle, Rocket } from 'lucide-react';
 import { useState } from 'react';
 import KnightIcon from '../ui/KnightIcon';
 
@@ -31,6 +31,28 @@ const modules = [
       { to: '/whatsapp', label: 'Assistente WhatsApp', icon: MessageSquare },
     ],
   },
+  {
+    id: 'sites',
+    label: 'Sites',
+    icon: Globe,
+    defaultPath: '/sites',
+    children: [
+      { to: '/sites', label: 'Sites de Demo', icon: Globe },
+      { to: '/sites/novo', label: 'Criar Site', icon: PlusCircle },
+      { to: '/sites/config', label: 'Configurações', icon: Rocket },
+    ],
+  },
+  {
+    id: 'ia',
+    label: 'IA',
+    icon: BookOpen,
+    defaultPath: '/ai/knowledge',
+    children: [
+      { to: '/ai/knowledge', label: 'Base de Conhecimento', icon: BookOpen },
+      { to: '/ai/analytics', label: 'Performance da IA', icon: BarChart3 },
+      { to: '/ai/settings', label: 'Aprendizado', icon: Settings },
+    ],
+  },
 ];
 
 // Detecta se uma rota pertence a um módulo
@@ -38,7 +60,7 @@ function isPathInModule(path, module) {
   return module.children.some((child) => path.startsWith(child.to));
 }
 
-function SidebarContent({ mobileOpen, setMobileOpen, navLinkClass, subLinkClass }) {
+function SidebarContent({ setMobileOpen, navLinkClass, subLinkClass }) {
   const location = useLocation();
   const [expandedModule, setExpandedModule] = useState(() => {
     // Expandir automaticamente o módulo da rota atual
@@ -62,10 +84,10 @@ function SidebarContent({ mobileOpen, setMobileOpen, navLinkClass, subLinkClass 
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {/* Itens gerais */}
-        {generalItems.map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} className={navLinkClass} onClick={() => setMobileOpen(false)}>
-            <Icon className="w-5 h-5 flex-shrink-0" />
-            {label}
+        {generalItems.map((item) => (
+          <NavLink key={item.to} to={item.to} className={navLinkClass} onClick={() => setMobileOpen(false)}>
+            <item.icon className="w-5 h-5 flex-shrink-0" />
+            {item.label}
           </NavLink>
         ))}
 

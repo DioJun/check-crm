@@ -37,9 +37,18 @@ model Lead {
   observacoes       String?  // Anotações livres
   porte             String?  // Pequeno, Medio, Grande
   tempoMercado      String?  // Menos1ano, 1a3anos, 3a5anos, Mais5anos
+  aniversario       DateTime? // Para alerta de oportunidade (1.4)
+  leadScore         Int?      // Score dinâmico 0-100 (Funcionalidade 3)
   aiAnalysis        String?
   aiAnalysisAt      DateTime?
   interacoes        Interacao[]
+  alertas           Alerta[]
+  scoreHistorico    ScoreHistorico[]
+  ofertas           LeadProduto[]
+  actionLogs        AlertaLog[]
+  intelligence      LeadIntelligence?
+  suggestionLogs    AiSuggestionLog[]
+  sites             SiteDemo[]
 }
 
 model Interacao {
@@ -49,4 +58,213 @@ model Interacao {
   tipo     String   @default("mensagem")
   conteudo String
   data     DateTime @default(now())
+}
+
+/// Catálogo de produtos/serviços para sugestão de ofertas (Funcionalidade 2)
+model Produto {
+  id          String   @id @default(uuid())
+  nome        String
+  descricao   String
+  preco       Float
+  condicoes   String?  // ex: "3x sem juros", "mensal"
+  tags        String   @default("[]") // JSON array de categorias (ex: ["gestao_equipe","crm"])
+  publicoAlvo String?  // descrição do público ideal
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  ofertas     LeadProduto[]
+}
+
+/// Histórico de ofertas sugeridas por lead (2.4)
+model LeadProduto {
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  produtoId String
+  produto   Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  contexto  String?  // trecho da conversa que gerou o match
+  status    String   @default("sugerido") // sugerido | usou | ignorou
+  createdAt DateTime @default(now())
+
+  @@id([leadId, produtoId])
+}
+
+/// Alertas de relacionamento (Funcionalidade 1)
+model Alerta {
+  id            String    @id @default(uuid())
+  leadId        String
+  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tipo          String    // inatividade | urgencia | risco | oportunidade | padrao
+  prioridade    String    // alta | media | informativa
+  titulo        String
+  mensagem      String
+  detalhe       String?   // JSON com contexto (keyword, dias, resumo)
+  status        String    @default("ativo") // ativo | silenciado | resolvido
+  silenciadoAte DateTime?
+  resolvidoEm   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([leadId, status, createdAt])
+}
+
+/// Histórico de variação do lead score (3.3)
+model ScoreHistorico {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  score     Int
+  fatores   String?  // JSON com breakdown dos fatores
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
+}
+
+/// Registro de ações do vendedor sobre alertas e ofertas (2.4 + aprendizado)
+/// Ex: "Vendedor ignorou alerta X", "Vendedor usou sugestão Y"
+model AlertaLog {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  vendedorId String? // futuro multi-vendedor (Camada 5)
+  tipo      String   // alerta | oferta | score
+  acao      String   // visualizou | silenciou | resolveu | ignorou | usou | copiou
+  alertaId  String?  // referência ao alerta (se tipo=alerta)
+  detalhe   String?  // JSON com contexto (titulo, produto, motivo)
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
+  @@index([vendedorId, createdAt])
+}
+
+/// CAMADA 1 — Memória individual por lead (perfil comportamental)
+/// Atualizado a cada conversa analisada; injetado no prompt da IA antes de sugerir.
+model LeadIntelligence {
+  id                 String   @id @default(uuid())
+  leadId             String   @unique
+  lead               Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  preferredTone      String   @default("formal") // formal | informal | tecnico | casual
+  activeHours        String   @default("")        // ex: "14-16h"
+  avgResponseTimeMin Int      @default(0)         // tempo médio de resposta em minutos
+  objections         String   @default("[]")      // JSON array de objeções recorrentes
+  interestedProducts String   @default("[]")      // JSON array de produtos/serviços de interesse
+  engagementScore    Int      @default(50)        // 0-100 (sinergia com leadScore)
+  recentSummaries    String   @default("[]")      // JSON array das últimas 5 conversas {resumo, resultado}
+  lastUpdated        DateTime @default(now())
+
+  @@index([leadId])
+}
+
+/// Configurações chave-valor (thresholds personalizáveis — Passo 8)
+model Configuracao {
+  id          String   @id @default(uuid())
+  chave       String   @unique
+  valor       String
+  atualizadoEm DateTime @default(now())
+}
+
+/// CAMADA 2 — Feedback Loop com o Vendedor
+/// Registra cada sugestão da IA, o texto final que o vendedor enviou (se editou),
+/// a diferença, e o resultado da interação com o lead.
+model AiSuggestionLog {
+  id             String    @id @default(uuid())
+  leadId         String
+  lead           Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  vendedorId     String?   // futuro multi-vendedor (Camada 5)
+  contexto       String    @default("whatsapp") // whatsapp | lead_detail | import
+  suggestionText String    // texto original gerado pela IA
+  vendedorText   String?   // texto final enviado (pós-edição do vendedor)
+  diff           String?   // JSON com o que mudou (adicionado/removido)
+  result         String    @default("pendente") // positivo | negativo | ignorou | pendente
+  actionTaken    String    @default("visualizou") // visualizou | copiou | editou | ignorou
+  optOut         Boolean   @default(false) // "não usar esta conversa para aprendizado"
+  responseTimeMin Int?     // tempo até resposta do lead (após envio)
+  createdAt      DateTime  @default(now())
+
+  @@index([leadId, createdAt])
+  @@index([result, createdAt])
+}
+
+/// CAMADA 2 — Métricas agregadas de performance da IA (período)
+/// Atualizadas pelo auto-ajuste (analyzeAndAdjust).
+model AiPerformanceMetrics {
+  id              String   @id @default(uuid())
+  period          String   @unique // ex: "2026-08-01"
+  accuracyRate    Float    @default(0) // % sugestões aceitas sem edição
+  editRate        Float    @default(0) // % sugestões editadas
+  positiveRate    Float    @default(0) // % respostas positivas do lead
+  avgResponseTimeMin Float  @default(0)
+  topPatterns     String   @default("[]") // JSON com padrões detectados
+  suggestedParams String   @default("{}") // JSON com parâmetros auto-ajustados
+  updatedAt       DateTime @default(now())
+}
+
+/// CAMADA 3 — Base de Conhecimento do Negócio (RAG)
+/// Documentos enviados pelo dono (catálogo, scripts, FAQ, políticas, cases).
+model KnowledgeDoc {
+  id         String   @id @default(uuid())
+  leadId     String?  // null = global (vale para todos)
+  nome       String
+  tipo       String   @default("texto") // pdf | txt | docx | formulario
+  categoria  String   @default("outros") // produto | script | faq | preco | case | concorrencia | onboarding | outros
+  status     String   @default("pronto") // processando | pronto | erro
+  conteudo   String?  // texto extraído completo (para documentos)
+  chunkCount Int      @default(0)
+  usos       Int      @default(0) // quantas vezes a IA consultou este doc
+  createdAt  DateTime @default(now())
+  chunks     KnowledgeChunk[]
+
+  @@index([categoria])
+}
+
+/// CAMADA 3 — Chunks com embedding para busca vetorial (RAG)
+model KnowledgeChunk {
+  id        String      @id @default(uuid())
+  docId     String
+  doc       KnowledgeDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  texto     String
+  embedding String      @default("[]") // JSON array de floats (TF-IDF hashing 256d)
+  fonte     String      @default("")   // ex: "produto:Site Profissional"
+  createdAt DateTime    @default(now())
+
+  @@index([docId])
+}
+
+/// MÓDULO SITES — Site de demonstração gerado por IA para vender o produto final
+/// Regra de ouro: é apenas amostra/degustação, nunca o produto completo.
+model SiteDemo {
+  id             String        @id @default(uuid())
+  leadId         String
+  lead           Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status         String        @default("gerado") // gerado | enviado | visualizado | aprovado | fechado | ignorado
+  template       String        @default("servico") // barbearia | restaurante | advocacia | clinica | personal | loja | servico
+  ramo           String?       // ramo detectado (ex: "Barbearia")
+  cor            String        @default("#d4af37") // cor principal hex
+  tom            String        @default("moderno") // moderno | formal | divertido
+  nomeSite       String?       // ex: "Barbearia do João"
+  link           String?       // URL de deploy (Vercel)
+  arquivosJson   String        @default("{}") // JSON { index.html, style.css, script.js }
+  conteudo       String?       // metadados de conteúdo usado na geração (JSON)
+  instrucoes     String?       // instruções diretas do vendedor p/ a IA (campo de chat)
+  visualizacoes  Int           @default(0)
+  ultimaVisita   DateTime?
+  enviadoEm      DateTime?
+  aprovadoEm     DateTime?
+  fechadoEm      DateTime?
+  briefing       String?       // JSON com briefing de fechamento (produto final)
+  observacoes    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  visitas        SiteVisita[]
+
+  @@index([leadId])
+  @@index([status])
+}
+
+/// Visita registrada no site de demonstração (tracking para alertas CRM)
+model SiteVisita {
+  id         String   @id @default(uuid())
+  siteDemoId String
+  siteDemo   SiteDemo @relation(fields: [siteDemoId], references: [id], onDelete: Cascade)
+  origem     String   @default("direto") // direto | whatsapp | utm | preview
+  visitadoEm DateTime @default(now())
+
+  @@index([siteDemoId, visitadoEm])
 }
